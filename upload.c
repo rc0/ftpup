@@ -379,7 +379,7 @@ int upload(const char *password, int is_dummy_run, const char *listing_file, int
     ftp_close(ctrl_con);
   }
 
-  return;
+  return 0;
 }
 /*}}}*/
 

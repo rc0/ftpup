@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g
+CFLAGS=-g -Wall
 
 OBJ := main.o localinv.o fileinv.o remoteinv.o ftp.o upload.o
 

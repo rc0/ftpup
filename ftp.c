@@ -590,6 +590,7 @@ int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
     next_a = a->next;
     free(a);
   }
+  return 0;
 }
 /*}}}*/
 
@@ -636,7 +637,7 @@ int ftp_binary(struct FTP *ctrl_con)/*{{{*/
   put_cmd(ctrl_con, "TYPE I", NULL);
   status = read_status(ctrl_con);
   if (verbose) {
-    printf("Got status %d for TYPE I command\n");
+    printf("Got status %d for TYPE I command\n", status);
   }
 
   if (status >= 400) {
