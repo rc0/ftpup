@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netdb.h>
 #include <netinet/in.h>
 
@@ -648,13 +649,17 @@ int ftp_binary(struct FTP *ctrl_con)/*{{{*/
   return 0;
 }
 /*}}}*/
-int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_path)/*{{{*/
+int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_path, void (*callback)(void*,int), void *cb_arg)/*{{{*/
 {
+
+#define CHUNKSIZE 512
+  
   int data_fd;
   FILE *local, *remote;
   int status, mapped_status;
-  char buffer[4096];
-  int n;
+  char buffer[CHUNKSIZE];
+  int n, bytes_done, size;
+  struct stat sb;
 
   local = fopen(local_path, "rb");
   if (!local) {
@@ -679,11 +684,23 @@ int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_p
   }
 
   remote = fdopen(data_fd, "w");
+
+  if (fstat(fileno(local), &sb) < 0) {
+    perror("ftp_write, stat");
+    exit(1);
+  }
   
+  bytes_done = 0;
   while (1) {
-    n = fread(buffer, 1, 4096, local);
+    n = fread(buffer, 1, CHUNKSIZE, local);
     if (!n) break;
     fwrite(buffer, 1, n, remote);
+    bytes_done += n;
+    if (callback) {
+      double percent;
+      percent = 100.0 * (double) bytes_done / (double) sb.st_size;
+      (*callback)(cb_arg, (int) percent);
+    }
   }
 
   fclose(remote);

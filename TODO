@@ -1,15 +1,11 @@
 - when building remote inventory, detect lack of write perm and fix. (? do we need this?)
 
-- truncate paths to just the right-most portion for comfort messages
-
 - comfort messages need to include how many files are done v how many to go and
   an idea of total amount of date done and to go also.
 
 - for update, write new file to a temporary name and use renaming after the
   upload - avoid situation where a half-present file is on the remote site for
   an extended period.  (use STOU)
-
-- show %done for file upload to give more comfort for slow servers + start/finish messages
 
 - valgrind the program
 

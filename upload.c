@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <time.h>
 
 #include "ftp.h"
 #include "invent.h"
@@ -194,6 +195,37 @@ static void remove_dead_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE 
 }
 /*}}}*/
 
+static char *truncate_name(const char *name)/*{{{*/
+{
+  int len;
+  static char output[64];
+  len = strlen(name);
+  if (len > 60) {
+    strcpy(output, "...");
+    strcpy(output+3, name + (len - 60));
+  } else {
+    strcpy(output, name);
+  }
+  return output;
+}
+/*}}}*/
+struct callback_info {/*{{{*/
+  time_t last_time;
+};
+/*}}}*/
+static void write_callback(void *arg_info, int percent)/*{{{*/
+{
+  time_t now;
+  struct callback_info *info = arg_info;
+  now = time(NULL);
+  /* Only update the output once per second at most. */
+  if (now > info->last_time) {
+    info->last_time = now;
+    printf("\b\b\b\b%2d%%)", percent);
+    fflush(stdout);
+  }
+}
+/*}}}*/
 static void create_directory(struct FTP *ctrl_con, struct fnode *dir, FILE *journal)/*{{{*/
 {
   int status;
@@ -213,15 +245,19 @@ static void create_directory(struct FTP *ctrl_con, struct fnode *dir, FILE *jour
 static void create_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
 {
   int status;
+  char *short_name = truncate_name(file->path);
+  struct callback_info info;
+  
   /* FIXME : magic symlink */
-  printf("Starting to create remote file %s (%d bytes)\r", file->path, file->x.file.size);
+  printf("Creating remote file %s (%d bytes) ( 0%%)", short_name, file->x.file.size);
   fflush(stdout);
-  status = ftp_write(ctrl_con, file->path, file->path);
+  info.last_time = time(NULL);
+  status = ftp_write(ctrl_con, file->path, file->path, write_callback, &info);
   /* FIXME : md5sum */
   if (status) {
     fprintf(journal, "F %8d %08lx %s\n", file->x.file.size, file->x.file.mtime, file->path);
     fflush(journal);
-    printf("Done creating new remote file %s (%d bytes)  \n", file->path, file->x.file.size);
+    printf("\rDone creating new remote file %s (%d bytes)\n", file->path, file->x.file.size);
     fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO CREATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);
@@ -251,18 +287,24 @@ static void add_new_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *jo
 static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
 {
   int status;
+  char *short_name;
   struct fnode *local_peer = file->x.file.peer;
+  struct callback_info info;
+  
   /* FIXME : magic symlink */
   /* ? do we need to delete the file first for safety (according to STOR in
    * RFC959, no.) */
-  printf("Starting to update %s (%d bytes)\r", file->path, local_peer->x.file.size);
+  short_name = truncate_name(file->path);
+
+  printf("Updating %s (%d bytes) ( 0%%)", short_name, local_peer->x.file.size);
   fflush(stdout);
-  status = ftp_write(ctrl_con, file->path, file->path);
+  info.last_time = time(NULL);
+  status = ftp_write(ctrl_con, file->path, file->path, write_callback, &info);
   /* FIXME : md5sum */
   if (status) {
     fprintf(journal, "F %8d %08lx %s\n", local_peer->x.file.size, local_peer->x.file.mtime, file->path);
     fflush(journal);
-    printf("Done updating remote file %s (%d bytes)  \n", file->path, local_peer->x.file.size);
+    printf("\rDone updating remote file %s (%d bytes)\n", file->path, local_peer->x.file.size);
     fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO UPDATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);

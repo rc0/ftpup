@@ -22,7 +22,9 @@ extern int ftp_cwd(struct FTP *, const char *new_root_dir);
 
 extern int ftp_write(struct FTP *,
                      const char *local_path, /* local path */
-                     const char *remote_path); /* path on remote server */
+                     const char *remote_path, /* path on remote server */
+                     void (*callback)(void*,int),
+                     void *cb_arg);
 
 extern int ftp_read(struct FTP *,
                     const char *remote_path,
