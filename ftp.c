@@ -16,7 +16,9 @@ extern int verbose;
 
 /* Private definition of opaque structure. */
 struct FTP {/*{{{*/
-  int fd;   /* fd of the socket */
+  int fd;        /* fd of the control socket */
+  int active;    /* 1 if use active on the data connection, 0 for passive */
+  int listen_fd; /* listening fd for active mode */
   
   char readbuf[4096];
   char *bufptr;
@@ -106,7 +108,7 @@ static void put_cmd(struct FTP *con, const char *cmd, const char *arg)/*{{{*/
   free(xcmd);
 }
 /*}}}*/
-struct FTP *ftp_open(const char *hostname, const char *username, const char *password)/*{{{*/
+struct FTP *ftp_open(const char *hostname, const char *username, const char *password, int active_ftp)/*{{{*/
 {
   struct FTP *result;
   struct hostent *host;
@@ -163,6 +165,9 @@ struct FTP *ftp_open(const char *hostname, const char *username, const char *pas
     fprintf(stderr, "Password authentication failed\n");
     exit(1);
   }
+
+  result->active = active_ftp;
+
   return result;
 }
 /*}}}*/
@@ -229,6 +234,99 @@ int open_passive_data_con(struct FTP *ctrl_con)/*{{{*/
     fprintf(stderr, "Could not read host and port\n");
     exit(1);
   }
+}
+/*}}}*/
+
+static void setup_active_data_con(struct FTP *ctrl_con)/*{{{*/
+{
+  struct sockaddr_in ctrl_sock_addr, data_sock_addr;
+  int ctrl_sock_addr_len, data_sock_addr_len;
+  int status;
+  unsigned long ip_addr;
+  unsigned short port;
+  int listen_fd, accept_fd;
+  char port_string[24];
+
+  ctrl_sock_addr_len = sizeof(struct sockaddr_in);
+  status = getsockname(ctrl_con->fd, (struct sockaddr *) &ctrl_sock_addr, &ctrl_sock_addr_len);
+  if (status < 0) {
+    perror("getsocknamd(ctrl_con)");
+    exit(1);
+  }
+  ip_addr = ntohl(ctrl_sock_addr.sin_addr.s_addr);
+  port = ntohs(ctrl_sock_addr.sin_port);
+
+  data_sock_addr.sin_family = AF_INET;
+  data_sock_addr.sin_addr.s_addr = ctrl_sock_addr.sin_addr.s_addr;
+  data_sock_addr.sin_port = 0;
+  data_sock_addr_len = sizeof(data_sock_addr);
+
+  listen_fd = socket(PF_INET, SOCK_STREAM, 0);
+  if (listen_fd < 0) {
+    perror("socket(listen_fd)");
+    exit(1);
+  }
+
+  if (bind(listen_fd, (struct sockaddr *) &data_sock_addr, data_sock_addr_len) < 0) {
+    perror("bind(listen_fd)");
+    exit(1);
+  }
+
+  if (listen(listen_fd, 1) < 0) {
+    perror("listen(listen_fd)");
+    exit(1);
+  }
+
+  /* Get actual port number */
+  status = getsockname(listen_fd, (struct sockaddr *) &data_sock_addr, &data_sock_addr_len);
+  if (status < 0) {
+    perror("getsockname(listen_fd)");
+    exit(1);
+  }
+
+  ip_addr = htonl(data_sock_addr.sin_addr.s_addr);
+  port = ntohs(data_sock_addr.sin_port);
+  sprintf(port_string, "%d,%d,%d,%d,%d,%d",
+          (int)((ip_addr>>24) & 0xff),
+          (int)((ip_addr>>16) & 0xff),
+          (int)((ip_addr>> 8) & 0xff),
+          (int)((ip_addr    ) & 0xff),
+          (int)((port   >> 8) & 0xff),
+          (int)((port       ) & 0xff));
+  put_cmd(ctrl_con, "PORT", port_string);
+  status = read_status(ctrl_con);
+  if (verbose) {
+    printf("Got %d from PORT %s command\n", status, port_string);
+  }
+  if (status >= 400) {
+    fprintf(stderr, "Failed to set port number\n");
+    exit(1);
+  }
+
+  ctrl_con->listen_fd = listen_fd;
+  return;
+}
+/*}}}*/
+
+static int open_active_data_con(struct FTP *ctrl_con)/*{{{*/
+{
+  struct sockaddr_in peer_sock_addr;
+  int peer_sock_addr_len;
+  int status;
+  unsigned long ip_addr;
+  unsigned short port;
+  int accept_fd;
+
+  peer_sock_addr_len = sizeof(peer_sock_addr);
+  accept_fd = accept(ctrl_con->listen_fd, (struct sockaddr *) &peer_sock_addr, &peer_sock_addr_len);
+  ip_addr = htonl(peer_sock_addr.sin_addr.s_addr);
+  port = ntohs(peer_sock_addr.sin_port);
+
+  /* Don't need to listen any longer. */
+  close(ctrl_con->listen_fd);
+
+  return accept_fd;
+
 }
 /*}}}*/
 
@@ -361,7 +459,12 @@ int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
 
   fl.next = fl.prev = &fl;
   
-  data_fd = open_passive_data_con(ctrl_con);
+  if (ctrl_con->active) {
+    setup_active_data_con(ctrl_con);
+  } else {
+    data_fd = open_passive_data_con(ctrl_con);
+  }
+
   if (!strcmp(dir_path, ".")) {
     /* Otherwise SuperH's FTP server, for one, gets confused */
     put_cmd(ctrl_con, "LIST -a", NULL);
@@ -372,6 +475,10 @@ int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
   status = read_status(ctrl_con);
   if (verbose) {
     printf("Got status %d after LIST %s\n", status, dir_path);
+  }
+
+  if (ctrl_con->active) {
+    data_fd = open_active_data_con(ctrl_con);
   }
 
   N = 0;
@@ -470,8 +577,11 @@ int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_p
     return 0;
   }
 
-  data_fd = open_passive_data_con(ctrl_con);
-  remote = fdopen(data_fd, "w");
+  if (ctrl_con->active) {
+    setup_active_data_con(ctrl_con);
+  } else {
+    data_fd = open_passive_data_con(ctrl_con);
+  }
   put_cmd(ctrl_con, "STOR", remote_path);
   status = read_status(ctrl_con);
   if (verbose) {
@@ -479,6 +589,12 @@ int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_p
   }
   if (status >= 400) return 0;
 
+  if (ctrl_con->active) {
+    data_fd = open_active_data_con(ctrl_con);
+  }
+
+  remote = fdopen(data_fd, "w");
+  
   while (1) {
     n = fread(buffer, 1, 4096, local);
     if (!n) break;

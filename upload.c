@@ -347,7 +347,7 @@ static void preen_listing(const char *listing_file)/*{{{*/
 /*}}}*/
 
 /* Assume already in correct local directory. */
-int upload(const char *password, int is_dummy_run, const char *listing_file)/*{{{*/
+int upload(const char *password, int is_dummy_run, const char *listing_file, int active_ftp)/*{{{*/
 {
   struct fnode *localinv;
   struct fnode *fileinv;
@@ -370,7 +370,7 @@ int upload(const char *password, int is_dummy_run, const char *listing_file)/*{{
     upload_dummy(localinv, fileinv);
   } else {
     struct FTP *ctrl_con;
-    ctrl_con = ftp_open(rp.hostname, rp.username, password);
+    ctrl_con = ftp_open(rp.hostname, rp.username, password, active_ftp);
     if (rp.remote_root) {
       ftp_cwd(ctrl_con, rp.remote_root);
     }

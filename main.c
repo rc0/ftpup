@@ -33,6 +33,8 @@ int main (int argc, char **argv) {
   
   /* Work out what would get uploaded/removed and show to user */
   int do_dummy_upload = 0;
+
+  int active_ftp = 0;
   
   while (++argv, --argc) {
     if ((*argv)[0] == '-') {
@@ -59,6 +61,8 @@ int main (int argc, char **argv) {
         do_remote_inv = 1;
       } else if (!strcmp(*argv, "-v") || !strcmp(*argv, "--verbose")) {
         verbose = 1;
+      } else if (!strcmp(*argv, "-a") || !strcmp(*argv, "--active-ftp")) {
+        active_ftp = 1;
       } else {
         fprintf(stderr, "Unrecognized option %s\n", *argv);
         exit(2);
@@ -93,13 +97,13 @@ int main (int argc, char **argv) {
       fprintf(stderr, "-R requires username\n");
       exit(1);
     }
-    reminv = make_remoteinv(hostname, username, password, remote_root);
+    reminv = make_remoteinv(hostname, username, password, remote_root, active_ftp);
     print_inventory(reminv, listing_file, hostname, username, remote_root);
   } else if (do_lint) {
   } else if (do_upload) {
-    upload(password, 0, listing_file);
+    upload(password, 0, listing_file, active_ftp);
   } else if (do_dummy_upload) {
-    upload(password, 1, listing_file);
+    upload(password, 1, listing_file, active_ftp);
   }
 
   return 0;

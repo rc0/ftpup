@@ -13,7 +13,8 @@ struct FTP_stat {
 
 extern struct FTP *ftp_open(const char *host,
                             const char *username,
-                            const char *password);
+                            const char *password,
+                            int active_ftp);
 
 extern int ftp_close(struct FTP *);
 

@@ -47,12 +47,12 @@ void add_fnode_at_end(struct fnode *parent, struct fnode *new_fnode);
 /* Assume already in the right directory at the point this is called. */
 struct fnode *make_localinv(const char *to_avoid);
 struct fnode *make_fileinv(const char *listing, struct remote_params *);
-struct fnode *make_remoteinv(const char *hostname, const char *username, const char *password, const char *remote_root);
+struct fnode *make_remoteinv(const char *hostname, const char *username, const char *password, const char *remote_root, int active_ftp);
 
 void print_inventory(struct fnode *a, const char *to_file, const char *hostname, const char *username, const char *remote_root);
 
 void init_remote_params(struct remote_params *rp);  
-int upload(const char *password, int is_dummy_run, const char *listing_file);
+int upload(const char *password, int is_dummy_run, const char *listing_file, int active_ftp);
 
 #endif /* INVENT_H */
 
