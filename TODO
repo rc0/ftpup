@@ -5,10 +5,6 @@
 - comfort messages need to include how many files are done v how many to go and
   an idea of total amount of date done and to go also.
 
-- write out clean journal before starting upload process
-or
-- implement preen mode to cut listing file down to just the latest entry for each file/dir
-
 - for update, write new file to a temporary name and use renaming after the
   upload - avoid situation where a half-present file is on the remote site for
   an extended period.  (use STOU)
@@ -21,9 +17,16 @@ or
 
 - md5 stuff, rename detection + upload (chains + rings of renames etc)
 
+- when mtime is zero from fileinv, update with mtime from corresponding localinv
+
+- globally configurable ignore lists (with globbing)
+
+- per-directory and per-subtree ignore lists
+
 - test against more ftp servers
 
 - active data connection
+
 
 # arch-tag: c7d95446-c4b1-48a8-920c-dc8ec90229c6
 

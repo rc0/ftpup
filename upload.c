@@ -5,6 +5,7 @@
 
 #include "ftp.h"
 #include "invent.h"
+#include "memory.h"
 
 static void set_subdir_unique(struct fnode *x, int to_what)/*{{{*/
 {
@@ -316,12 +317,47 @@ void init_remote_params(struct remote_params *rp)/*{{{*/
 }
 /*}}}*/
 
+static void preen_listing(const char *listing_file)/*{{{*/
+{
+  char *nlf;
+  int len;
+  struct remote_params rp;
+  struct fnode *fileinv;
+
+  len = strlen(listing_file);
+  nlf = new_array(char, len + 5);
+  strcpy(nlf, listing_file);
+  strcat(nlf, ".new");
+
+  init_remote_params(&rp);
+  fileinv = make_fileinv(listing_file, &rp);
+  print_inventory(fileinv, nlf, rp.hostname, rp.username, rp.remote_root);
+  if (rename(nlf, listing_file) < 0) {
+    fprintf(stderr, "Could not rename new listing file %s to %s\n", nlf, listing_file);
+    exit(1);
+  }
+
+  free(rp.hostname);
+  free(rp.username);
+  if (rp.remote_root) free(rp.remote_root);
+  free(nlf);
+  /* FIXME : fileinv is leaked */
+
+}
+/*}}}*/
+
 /* Assume already in correct local directory. */
 int upload(const char *password, int is_dummy_run, const char *listing_file)/*{{{*/
 {
   struct fnode *localinv;
   struct fnode *fileinv;
   struct remote_params rp;
+
+  if (!is_dummy_run) {
+    printf("Preening listing file... "); fflush(stdout);
+    preen_listing(listing_file);
+    printf("done\n"); fflush(stdout);
+  }
 
   init_remote_params(&rp);
 
