@@ -19,5 +19,10 @@
 
 - show %done for file upload to give more comfort for slow servers.
 
+- remember hostname, username and remote root details in listing file.  Should
+  only have to enter them when doing the -R option the first time.
+
+- -N should not require password.
+
 # arch-tag: c7d95446-c4b1-48a8-920c-dc8ec90229c6
 

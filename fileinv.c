@@ -78,7 +78,7 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   size = atol(p);
   while (!isspace(*p)) p++;
   while (isspace(*p)) p++;
-  mtime = atol(p);
+  sscanf(p, "%lx", &mtime);
   while (!isspace(*p)) p++;
   while (isspace(*p)) p++;
   /* p now pointing to path */
@@ -99,6 +99,7 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   nfn->is_dir = 0;
   nfn->x.file.size = size;
   nfn->x.file.mtime = mtime;
+  nfn->x.file.peer = NULL;
   nfn->next = (struct fnode *) &d->next;
   nfn->prev = d->prev;
   d->prev->next = nfn;

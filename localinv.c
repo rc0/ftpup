@@ -102,6 +102,7 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
         nfn->is_dir = 0;
         nfn->x.file.size = sb.st_size;
         nfn->x.file.mtime = sb.st_mtime;
+        nfn->x.file.peer = NULL;
         add_fnode(a, nfn);
       } else if (S_ISDIR(sb.st_mode)) {
         struct fnode *nfn;

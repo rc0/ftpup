@@ -17,12 +17,14 @@ struct fnode {/*{{{*/
   char *path; /* complete path from top of tree */
   int is_dir;
   int is_unique; /* 1 if only in this tree, 0 if in peer too. */
-
   union {
     struct {
       size_t size;
       time_t mtime;
       /* Eventually : perms? md5sum? */
+      struct fnode *peer; /* Peer in other tree, if any */
+      int is_stale;  /* 1 if different between trees, 0 if the same (don't care if
+                        is_unique==1) */
     } file;
     struct {
       /* Linked list of entries in the subdirectory. */

@@ -63,12 +63,25 @@ matched:
 /*}}}*/
       } else {
         /*{{{ file/file */
-        /* FIXME : do something about mtime!! */
+        /* Mark uniques == 0, so that the new file is uploaded 'in place'
+         * rather than being deleted in the 1st pass and then uploaded anew in
+         * the 2nd pass. */
+        e1->is_unique = e2->is_unique = 0;
+        e1->x.file.peer = e2;
+        e2->x.file.peer = e1;
         if (e1->x.file.size == e2->x.file.size) {
-          e1->is_unique = e2->is_unique = 0;
+          /* Further check based on mtime.  Treat zero mtime as a wildcard
+           * (e.g. when the remote index has been built for the first time.)
+           * */
+          if (!e1->x.file.mtime || !e2->x.file.mtime ||
+              (e1->x.file.mtime == e2->x.file.mtime)) {
+            e1->x.file.is_stale = e2->x.file.is_stale = 0;
+          } else {
+            e1->x.file.is_stale = e2->x.file.is_stale = 1;
+          }
         } else {
-          /* same name, different content. */
-          e1->is_unique = e2->is_unique = 1;
+          /* Certainly differing */
+          e1->x.file.is_stale = e2->x.file.is_stale = 1;
         }
 /*}}}*/
       }
@@ -84,6 +97,7 @@ static void reconcile(struct fnode *f1, struct fnode *f2)/*{{{*/
   inner_reconcile(f1, f2);
 }
 /*}}}*/
+
 static void print_unique(struct fnode *x)/*{{{*/
 {
   struct fnode *e;
@@ -98,12 +112,27 @@ static void print_unique(struct fnode *x)/*{{{*/
   }
 }
 /*}}}*/
+static void print_stale(struct fnode *x)/*{{{*/
+{
+  struct fnode *e;
+  for (e = x->next; e != x; e = e->next) {
+    if (!e->is_unique && !e->is_dir && e->x.file.is_stale) {
+      printf("F %s\n", e->path);
+    }
+    if (e->is_dir) {
+      print_stale((struct fnode *) &e->x.dir.next);
+    }
+  }
+}
+/*}}}*/
 static void upload_dummy(struct fnode *localinv, struct fnode *fileinv)/*{{{*/
 {
   printf("UNIQUE IN LOCAL FILESYSTEM\n");
   print_unique(localinv);
   printf("\n\nUNIQUE IN REMOTE FILESYSTEM (FROM listing file)\n");
   print_unique(fileinv);
+  printf("\n\nOUT OF DATE IN REMOTE FILESYSTEM (FROM listing file)\n");
+  print_stale(fileinv);
 }
 /*}}}*/
 
@@ -216,6 +245,45 @@ static void add_new_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *jo
 }
 /*}}}*/
 
+static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
+{
+  int status;
+  /* FIXME : magic symlink */
+  /* ? do we need to delete the file first for safety (according to STOR in
+   * RFC959, no.) */
+  status = ftp_write(ctrl_con, file->path, file->path);
+  /* FIXME : md5sum */
+  if (status) {
+    struct fnode *local_peer = file->x.file.peer;
+    fprintf(journal, "F %8d %08lx %s\n", local_peer->x.file.size, local_peer->x.file.mtime, file->path);
+    fflush(journal);
+    printf("Updated remote file %s\n", file->path);
+  } else {
+    fprintf(stderr, "FAILED TO UPDATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);
+    exit(1);
+  }
+}
+/*}}}*/
+static void update_stale_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE *journal)/*{{{*/
+{
+  struct fnode *a;
+  for (a = fileinv->next; a != fileinv; a = a->next) {
+    /* deepest directories first */
+
+    if (a->is_dir) {
+      update_stale_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
+    } else {
+      /* it's a file */
+      if (a->x.file.is_stale) {
+        update_file(ctrl_con, a, journal);
+      } else {
+        /* nothing to do. */
+      }
+    }
+  }
+}
+/*}}}*/
+
 static void upload_for_real(struct FTP *ctrl_con, struct fnode *localinv, struct fnode *fileinv, const char *listing_file)/*{{{*/
 {
   FILE *journal;
@@ -228,9 +296,7 @@ static void upload_for_real(struct FTP *ctrl_con, struct fnode *localinv, struct
 
   remove_dead_files(ctrl_con, fileinv, journal);
   add_new_files(ctrl_con, localinv, journal);
-#if 0
   update_stale_files(ctrl_con, fileinv, journal);
-#endif
 
   return;
 

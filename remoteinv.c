@@ -61,6 +61,7 @@ static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x
       nfn->is_dir = 0;
       nfn->x.file.size = files[i].size;
       nfn->x.file.mtime = 0;
+      nfn->x.file.peer = NULL;
       /* TODO : something about perms */
       add_fnode(x, nfn);
     }
