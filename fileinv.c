@@ -47,7 +47,7 @@ static void lookup_dir(struct fnode *top, const char *full_path, const char *pat
     int len = slash - path;
     struct fnode *e;
     for (e = top->next; e != top; e = e->next) {
-      if (!strncmp(e->name, path, len)) {
+      if (!strncmp(e->name, path, len) && (e->name[len] == '\0')) {
         /* match */
         if (e->is_dir) {
           lookup_dir((struct fnode *) &e->x.dir.next, full_path, slash+1, dir, tail);
