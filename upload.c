@@ -100,41 +100,51 @@ static void reconcile(struct fnode *f1, struct fnode *f2)/*{{{*/
 }
 /*}}}*/
 
-static void print_unique(struct fnode *x)/*{{{*/
+static void print_unique(struct fnode *x, unsigned long *total_bytes)/*{{{*/
 {
   struct fnode *e;
   for (e = x->next; e != x; e = e->next) {
     if (e->is_unique) {
       printf("%c %s\n", e->is_dir ? 'D' : 'F',
              e->path);
+      if (!e->is_dir) {
+        *total_bytes += e->x.file.size;
+      }
     }
     if (e->is_dir) {
-      print_unique((struct fnode *) &e->x.dir.next);
+      print_unique((struct fnode *) &e->x.dir.next, total_bytes);
     }
   }
 }
 /*}}}*/
-static void print_stale(struct fnode *x)/*{{{*/
+static void print_stale(struct fnode *x, unsigned long *total_bytes)/*{{{*/
 {
   struct fnode *e;
   for (e = x->next; e != x; e = e->next) {
     if (!e->is_unique && !e->is_dir && e->x.file.is_stale) {
       printf("F %s\n", e->path);
+      *total_bytes += e->x.file.size;
     }
     if (e->is_dir) {
-      print_stale((struct fnode *) &e->x.dir.next);
+      print_stale((struct fnode *) &e->x.dir.next, total_bytes);
     }
   }
 }
 /*}}}*/
 static void upload_dummy(struct fnode *localinv, struct fnode *fileinv)/*{{{*/
 {
+  unsigned long total_bytes;
   printf("UNIQUE IN LOCAL FILESYSTEM\n");
-  print_unique(localinv);
+  total_bytes = 0;
+  print_unique(localinv, &total_bytes);
+  printf("TOTAL OF %ld bytes to upload\n", total_bytes);
   printf("\n\nUNIQUE IN REMOTE FILESYSTEM (FROM listing file)\n");
-  print_unique(fileinv);
+  total_bytes = 0;
+  print_unique(fileinv, &total_bytes);
   printf("\n\nOUT OF DATE IN REMOTE FILESYSTEM (FROM listing file)\n");
-  print_stale(fileinv);
+  total_bytes = 0;
+  print_stale(fileinv, &total_bytes);
+  printf("TOTAL OF %ld bytes to upload\n", total_bytes);
 }
 /*}}}*/
 
