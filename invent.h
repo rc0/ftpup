@@ -21,6 +21,8 @@ struct fnode {/*{{{*/
     struct {
       size_t size;
       time_t mtime;
+      int md5_defined;
+      unsigned char md5[16];
       /* Eventually : perms? md5sum? */
       struct fnode *peer; /* Peer in other tree, if any */
       int is_stale;  /* 1 if different between trees, 0 if the same (don't care if
@@ -49,6 +51,7 @@ struct fnode *make_localinv(const char *to_avoid);
 struct fnode *make_fileinv(const char *listing, struct remote_params *);
 struct fnode *make_remoteinv(const char *hostname, const char *username, const char *password, const char *remote_root, int active_ftp);
 
+char *format_md5(struct fnode *b);
 void print_inventory(struct fnode *a, const char *to_file, const char *hostname, const char *username, const char *remote_root);
 
 void init_remote_params(struct remote_params *rp);  

@@ -77,6 +77,9 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   const char *tail;
   struct fnode *e;
   struct fnode *nfn;
+  char md5[16], buf[3];
+  int i, val;
+  int md5_defined;
 
   p = line+1;
   while (isspace(*p)) p++;
@@ -86,6 +89,24 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   sscanf(p, "%lx", &mtime);
   while (!isspace(*p)) p++;
   while (isspace(*p)) p++;
+
+  /* p now pointing to md5 */
+  if (*p == '?') {
+    md5_defined = 0;
+  } else {
+    buf[2] = '\0';
+    for (i=0; i<16; i++) {
+      buf[0] = p[2*i];
+      buf[1] = p[2*i+1];
+      sscanf(buf, "%x", &val);
+      md5[i] = (unsigned char) val;
+    }
+    md5_defined = 1;
+  }
+
+  while (!isspace(*p)) p++;
+  while (isspace(*p)) p++;
+  
   /* p now pointing to path */
   lookup_dir(a, p, p, &d, &tail);
 
@@ -107,6 +128,10 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   nfn->x.file.size = size;
   nfn->x.file.mtime = mtime;
   nfn->x.file.peer = NULL;
+  nfn->x.file.md5_defined = md5_defined;
+  if (md5_defined) {
+    memcpy(nfn->x.file.md5, md5, 16);
+  }
   add_fnode_at_end(d, nfn);
 }
 /*}}}*/

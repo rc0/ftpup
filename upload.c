@@ -3,9 +3,43 @@
 #include <stdio.h>
 #include <sys/types.h>
 
+#include "md5.h"
 #include "ftp.h"
 #include "invent.h"
 #include "memory.h"
+
+static void compute_md5sums(struct fnode *d)
+{
+  /* Only applied to the localinv tree */
+  struct fnode *a;
+  for (a = d->next; a != d; a = a->next) {
+    if (a->is_dir) {
+      compute_md5sums((struct fnode *) &a->x.dir.next);
+    } else {
+      if (a->is_unique || a->x.file.is_stale) {
+        MD5_CTX ctx;
+        FILE *in;
+        unsigned char buf[4096];
+        int n;
+        MD5Init(&ctx);
+        in = fopen(a->path, "rb");
+        if (!in) {
+          fprintf(stderr, "Cannot open %s for reading\n", a->path);
+          exit(1);
+        }
+        while (1) {
+          n = fread(buf, 1, 4096, in);
+          if (!n) break;
+          MD5Update(&ctx, buf, n);
+        }
+        fclose(in);
+        MD5Final(&ctx);
+        memcpy(a->x.file.md5, ctx.digest, 16);
+        a->x.file.md5_defined = 1;
+      }
+    }
+  }
+}
 
 static void set_subdir_unique(struct fnode *x, int to_what)/*{{{*/
 {
@@ -19,20 +53,19 @@ static void set_subdir_unique(struct fnode *x, int to_what)/*{{{*/
   }
 }
 /*}}}*/
-
 static void set_file_unique(struct fnode *x, int to_what)/*{{{*/
 {
   x->is_unique = to_what;
   if (x->is_dir) set_subdir_unique((struct fnode *) &x->x.dir.next, to_what);
 }
 /*}}}*/
-static void inner_reconcile(struct fnode *f1, struct fnode *f2)/*{{{*/
+static void inner_reconcile(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
 {
   struct fnode *e1;
   struct fnode *e2;
 
-  for (e1 = f1->next; e1 != f1; e1 = e1->next) {
-    for (e2 = f2->next; e2 != f2; e2 = e2->next) {
+  for (e1 = fileinv->next; e1 != fileinv; e1 = e1->next) {
+    for (e2 = localinv->next; e2 != localinv; e2 = e2->next) {
       if (!strcmp(e1->name, e2->name)) {
         goto matched;
       }
@@ -90,12 +123,13 @@ matched:
   }
 }
 /*}}}*/
-static void reconcile(struct fnode *f1, struct fnode *f2)/*{{{*/
+static void reconcile(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
 {
   /* Work out what's in each tree that's not in the other one. */
-  set_subdir_unique(f1, 0);
-  set_subdir_unique(f2, 1);
-  inner_reconcile(f1, f2);
+  set_subdir_unique(fileinv, 0);
+  set_subdir_unique(localinv, 1);
+  inner_reconcile(fileinv, localinv);
+  compute_md5sums(localinv);
 }
 /*}}}*/
 
@@ -219,7 +253,8 @@ static void create_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
   status = ftp_write(ctrl_con, file->path, file->path);
   /* FIXME : md5sum */
   if (status) {
-    fprintf(journal, "F %8d %08lx %s\n", file->x.file.size, file->x.file.mtime, file->path);
+    char *md5buf = format_md5(file);
+    fprintf(journal, "F %8d %08lx %s %s\n", file->x.file.size, file->x.file.mtime, md5buf, file->path);
     fflush(journal);
     printf("Done creating new remote file %s (%d bytes)  \n", file->path, file->x.file.size);
     fflush(stdout);
@@ -260,7 +295,8 @@ static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
   status = ftp_write(ctrl_con, file->path, file->path);
   /* FIXME : md5sum */
   if (status) {
-    fprintf(journal, "F %8d %08lx %s\n", local_peer->x.file.size, local_peer->x.file.mtime, file->path);
+    char *md5buf = format_md5(local_peer);
+    fprintf(journal, "F %8d %08lx %s %s\n", local_peer->x.file.size, local_peer->x.file.mtime, md5buf, file->path);
     fflush(journal);
     printf("Done updating remote file %s (%d bytes)  \n", file->path, local_peer->x.file.size);
     fflush(stdout);

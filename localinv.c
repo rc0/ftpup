@@ -111,6 +111,7 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
         nfn->is_dir = 0;
         nfn->x.file.size = sb.st_size;
         nfn->x.file.mtime = sb.st_mtime;
+        nfn->x.file.md5_defined = 0;
         nfn->x.file.peer = NULL;
         add_fnode_at_end(a, nfn);
       } else if (S_ISDIR(sb.st_mode)) {
@@ -143,6 +144,24 @@ struct fnode *make_localinv(const char *to_avoid)/*{{{*/
 };
 /*}}}*/
 
+char *format_md5(struct fnode *b)
+{
+  static char md5buf[33];
+  static char lookup[17] = "0123456789abcdef";
+  int i;
+  if (b->x.file.md5_defined) {
+    for (i=0; i<16; i++) {
+      unsigned char byte = b->x.file.md5[i];
+      md5buf[2*i]   = lookup[(byte >> 4) & 0xf];
+      md5buf[2*i+1] = lookup[(byte     ) & 0xf];
+    }
+    md5buf[32] = '\0';
+  } else {
+    strcpy(md5buf, "?");
+  }
+  return md5buf;
+}
+
 static void inner_print_inventory(struct fnode *a, FILE *out)/*{{{*/
 {
   struct fnode *b;
@@ -152,7 +171,9 @@ static void inner_print_inventory(struct fnode *a, FILE *out)/*{{{*/
       fprintf(out ? out : stdout, "D                   %s\n", b->path);
       inner_print_inventory((struct fnode *) &b->x.dir.next, out);
     } else {
-      fprintf(out ? out : stdout, "F %8d %08lx %s\n", b->x.file.size, b->x.file.mtime, b->path);
+      char *md5buf;
+      md5buf = format_md5(b);
+      fprintf(out ? out : stdout, "F %8d %08lx %s %s\n", b->x.file.size, b->x.file.mtime, md5buf, b->path);
     }
   }
 }
