@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <assert.h>
 
 #include "md5.h"
 #include "ftp.h"
@@ -89,7 +90,9 @@ matched:
            * (e.g. when the remote index has been built for the first time.)
            * */
 
-          /* FIXME : need to look at md5sums as well here! */
+          /* Don't do md5 checksum compares at this stage : that would require
+           * md5summing every file in the local copy, which is too expensive.
+           * */
 
           if (!e1->x.file.mtime || !e2->x.file.mtime ||
               (e1->x.file.mtime == e2->x.file.mtime)) {
@@ -140,18 +143,23 @@ static void populate_unmatched(struct fnode *x, struct fnode **array, int *index
 /*}}}*/
 static void find_unmatched_files(struct fnode *fileinv, struct fnode ***entries, int *n_entries)/*{{{*/
 {
-  int N, i, index;
+  int N, index;
   struct fnode **ent;
   *n_entries = N = count_unmatched(fileinv);
   *entries = ent = new_array(struct fnode *, N);
   index = 0;
   populate_unmatched(fileinv, ent, &index);
 
+#if 0
   /* Test */
-  printf("Unmatched entries for potential rename :\n");
-  for (i=0; i<N; i++) {
-    printf("%s\n", ent[i]->path);
+  {
+    int i;
+    printf("Unmatched entries for potential rename :\n");
+    for (i=0; i<N; i++) {
+      printf("%s\n", ent[i]->path);
+    }
   }
+#endif
 }
 /*}}}*/
 
@@ -189,7 +197,7 @@ static void match_on_md5(struct fnode *a, struct fnode **table, int *n_table)/*{
   }
 
   if (hit) {
-    printf("Found a rename :\nlocal: %s\n  to\nremote: %s\n",
+    printf("Found a rename : local <%s> -> remote <%s>\n",
            a->path, table[m]->path);
     a->x.file.content_peer = table[m];
     table[m]->x.file.content_peer = a;
@@ -201,8 +209,10 @@ static void match_on_md5(struct fnode *a, struct fnode **table, int *n_table)/*{
     }
     --*n_table;
   } else {
+#if 0
     char *md5buf = format_md5(a);
     printf("No rename match for %s (%s)\n", a->path, md5buf);
+#endif
   }
 }
 /*}}}*/
@@ -228,24 +238,100 @@ static void find_content_matches(struct fnode *fileinv, struct fnode *localinv)/
 {
   struct fnode **remote_unmatched;
   int n_remote_unmatched;
-  int i;
 
   find_unmatched_files(fileinv, &remote_unmatched, &n_remote_unmatched);
   qsort(remote_unmatched, n_remote_unmatched, sizeof(struct fnode *), compare_unmatched);
-  printf("After sorting\n");
-  fflush(stdout);
-  for (i=0; i<n_remote_unmatched; i++) {
-    char *md5buf;
-    md5buf = format_md5(remote_unmatched[i]);
-    printf("%s %s\n", md5buf, remote_unmatched[i]->path);
+#if 0
+  {
+    int i;
+    printf("After sorting\n");
+    fflush(stdout);
+    for (i=0; i<n_remote_unmatched; i++) {
+      char *md5buf;
+      md5buf = format_md5(remote_unmatched[i]);
+      printf("%s %s\n", md5buf, remote_unmatched[i]->path);
+    }
+    printf("\n");
   }
-  printf("\n");
+#endif
   matchup_files(localinv, remote_unmatched, &n_remote_unmatched);
 
   free(remote_unmatched);
 }
 /*}}}*/
+static int detect_local_dir_remote_file(struct fnode *x)/*{{{*/
+{
+  struct fnode *a;
+  int fail = 0;
+  for (a = x->next; a != x; a = a->next) {
+    if (a->is_dir) {
+      if (a->path_peer && !a->path_peer->is_dir) {
+        fprintf(stderr, "Local dir %s is a remote file\n", a->path);
+        fail = 1;
+      }
+      fail |= detect_local_dir_remote_file(dir_children(a));
+    }
+  }
+  return fail;
+}
+/*}}}*/
+static int detect_local_file_remote_dir(struct fnode *x)/*{{{*/
+{
+  struct fnode *a;
+  int fail = 0;
+  for (a = x->next; a != x; a = a->next) {
+    if (a->is_dir) {
+      fail |= detect_local_file_remote_dir(dir_children(a));
+    } else {
+      if (a->path_peer && a->path_peer->is_dir) {
+        fprintf(stderr, "Local file %s is a remote dir\n", a->path);
+        fail = 1;
+      }
+    }
+  }
+  return fail;
+}
+/*}}}*/
+static int detect_dual_rename(struct fnode *x)/*{{{*/
+{
+  struct fnode *a;
+  int fail = 0;
+  for (a = x->next; a != x; a = a->next) {
+    if (a->is_dir) {
+      fail |= detect_dual_rename(dir_children(a));
+    } else {
+      if ((a->path_peer != NULL) && 
+          (a->x.file.content_peer != NULL) &&
+          (a->path_peer != a->x.file.content_peer) &&
+          (!a->path_peer->is_dir) &&
+          (a->path_peer->x.file.content_peer)) {
+        fprintf(stderr, "Local file %s is in a rename chain with remote file %s\n",
+            a->path, a->x.file.content_peer->path);
+        fail = 1;
+      }
+    }
+  }
+  return fail;
+}
+/*}}}*/
+static void detect_nontrivial_renames(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
+{
+  /* The tool is only designed to cope with simple renames, where a file
+   * currently named A on the remote server now has its contents in a file B on
+   * the local machine.  So we need to rename A to B remotely to fix this up.
+   * What we can't cope with is file1 named A remotely / B locally and file2
+   * named B remotely / C locally, since this requires the renames to be done
+   * in a certain order.  Even worse would be a loop - we certainly don't deal
+   * with that.  Also, we don't deal with renames where the existing remote
+   * name is now a local directory, or where a remote directory exists with a
+   * name that's now a file locally. */
 
+  if (detect_local_dir_remote_file(localinv)) exit(1);
+  if (detect_local_file_remote_dir(localinv)) exit(1);
+  if (detect_dual_rename(localinv)) exit(1);
+
+}
+/*}}}*/
 static void reconcile(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
 {
   /* Work out what's in each tree that's not in the other one. */
@@ -256,19 +342,62 @@ static void reconcile(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
   /* Don't compute this for everything here. */
   compute_md5sums(localinv);
 #endif
+
+  detect_nontrivial_renames(fileinv, localinv);
+  
 }
 /*}}}*/
 
+static int is_unique_file(struct fnode *e)/*{{{*/
+{
+  assert(!e->is_dir);
+  if ((e->x.file.content_peer == NULL) && 
+      ((e->path_peer == NULL) ||
+       ((!e->path_peer->is_dir) &&
+        (e->path_peer->x.file.content_peer != NULL)))) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+/*}}}*/
+static int is_stale_file(struct fnode *e)/*{{{*/
+{
+  assert(!e->is_dir);
+  if ((e->x.file.content_peer == NULL) &&
+      (e->path_peer != NULL) &&
+      (!e->path_peer->is_dir) &&
+      (!e->path_peer->x.file.content_peer)) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+/*}}}*/
+static int is_rename_file(struct fnode *e)/*{{{*/
+{
+  assert(!e->is_dir);
+  if (e->x.file.content_peer &&
+      (!e->path_peer || (e->path_peer != e->x.file.content_peer))) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+/*}}}*/
 static void print_unique(struct fnode *x)/*{{{*/
 {
   struct fnode *e;
   for (e = x->next; e != x; e = e->next) {
-    if (!e->path_peer) {
-      printf("%c %s\n", e->is_dir ? 'D' : 'F',
-             e->path);
-    }
     if (e->is_dir) {
+      if (!e->path_peer) {
+        printf("D %s\n", e->path);
+      }
       print_unique((struct fnode *) &e->x.dir.next);
+    } else {
+      if (is_unique_file(e)) {
+        printf("F %s\n", e->path);
+      }
     }
   }
 }
@@ -277,11 +406,26 @@ static void print_stale(struct fnode *x)/*{{{*/
 {
   struct fnode *e;
   for (e = x->next; e != x; e = e->next) {
-    if ((e->path_peer != NULL) && !e->is_dir && (e->x.file.content_peer == NULL)) {
-      printf("F %s\n", e->path);
-    }
     if (e->is_dir) {
       print_stale((struct fnode *) &e->x.dir.next);
+    } else {
+      if (is_stale_file(e)) {
+        printf("F %s\n", e->path);
+      }
+    }
+  }
+}
+/*}}}*/
+static void print_renames(struct fnode *x)/*{{{*/
+{
+  struct fnode *e;
+  for (e = x->next; e != x; e = e->next) {
+    if (e->is_dir) {
+      print_renames(dir_children(e));
+    } else {
+      if (is_rename_file(e)) {
+        printf("R %s->%s\n", e->path, e->x.file.content_peer->path);
+      }
     }
   }
 }
@@ -294,6 +438,8 @@ static void upload_dummy(struct fnode *localinv, struct fnode *fileinv)/*{{{*/
   print_unique(fileinv);
   printf("\n\nOUT OF DATE IN REMOTE FILESYSTEM (FROM listing file)\n");
   print_stale(fileinv);
+  printf("\n\nRENAMES REQUIRED IN REMOTE FILESYSTEM\n");
+  print_renames(fileinv);
 }
 /*}}}*/
 
@@ -335,25 +481,32 @@ static void remove_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
 static void remove_dead_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE *journal)/*{{{*/
 {
   /* Start from the deepest directory. */
-  struct fnode *a, *next_a;
-  for (a = fileinv->next; a != fileinv; a = next_a) {
+  struct fnode *a;
+  for (a = fileinv->next; a != fileinv; a = a->next) {
     if (a->is_dir) {
-      remove_dead_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
-    }
-    if (a->path_peer == NULL) {
-      if (a->is_dir) {
-        remove_directory(ctrl_con, a, journal);
-      } else {
+      remove_dead_files(ctrl_con, dir_children(a), journal);
+    } else {
+      if (is_unique_file(a)) {
         remove_file(ctrl_con, a, journal);
       }
     }
-    /* Do it this way so we can potentially handle freeing a from the list. */
-    next_a = a->next;
   }
-
 }
 /*}}}*/
-
+static void remove_old_directories(struct FTP *ctrl_con, struct fnode *fileinv, FILE *journal)/*{{{*/
+{
+  struct fnode *a, *next_a;
+  for (a = fileinv->next; a != fileinv; a = next_a) {
+    next_a = a->next;
+    if (a->is_dir) {
+      remove_old_directories(ctrl_con, dir_children(a), journal);
+      if (!a->path_peer) {
+        remove_directory(ctrl_con, a, journal);
+      }
+    }
+  }
+}
+/*}}}*/
 static void create_directory(struct FTP *ctrl_con, struct fnode *dir, FILE *journal)/*{{{*/
 {
   int status;
@@ -390,25 +543,68 @@ static void create_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
   }
 }
 /*}}}*/
+static void rename_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
+{
+  int status;
+  char *from, *to;
+  from = file->x.file.content_peer->path;
+  to   = file->path;
+  status = ftp_rename(ctrl_con, from, to);
+  if (status) {
+    char *md5buf;
+    fprintf(journal, "Z %s\n", from);
+    md5buf = format_md5(file);
+    fprintf(journal, "F %8d %08lx %s %s\n", file->x.file.size, file->x.file.mtime, md5buf, to);
+    fflush(journal);
+    printf("Renamed %s -> %s\n", from, to);
+    fflush(stdout);
+  } else {
+    fprintf(stderr, "FAILED TO RENAME %s -> %s ON REMOTE SIZE, ABORTING\n", from, to);
+    exit(1);
+  }
+}
+  /*}}}*/
 static void add_new_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *journal)/*{{{*/
 {
   struct fnode *a;
   for (a = localinv->next; a != localinv; a = a->next) {
-    /* Start with shallowest stuff */
-    if (a->path_peer == NULL) {
-      if (a->is_dir) {
-        create_directory(ctrl_con, a, journal);
-      } else {
+    if (a->is_dir) {
+      add_new_files(ctrl_con, dir_children(a), journal);
+    } else {
+      if (is_unique_file(a)) {
         create_file(ctrl_con, a, journal);
       }
-    }
-    if (a->is_dir) {
-      add_new_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
     }
   }
 }
 /*}}}*/
-
+static void create_new_directories(struct FTP *ctrl_con, struct fnode *localinv, FILE *journal)/*{{{*/
+{
+  struct fnode *a;
+  for (a = localinv->next; a != localinv; a = a->next) {
+    if (a->is_dir) {
+      if (a->path_peer == NULL) {
+        create_directory(ctrl_con, a, journal);
+      }
+      add_new_files(ctrl_con, dir_children(a), journal);
+    }
+  }
+}
+/*}}}*/
+static void rename_moved_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *journal)/*{{{*/
+{
+  struct fnode *a;
+  for (a = localinv->next; a != localinv; a = a->next) {
+    if (a->is_dir) {
+      rename_moved_files(ctrl_con, dir_children(a), journal);
+    } else {
+      if (is_rename_file(a)) {
+        rename_file(ctrl_con, a, journal);
+      }
+    }
+  }
+}
+/*}}}*/
 static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
 {
   int status;
@@ -437,16 +633,11 @@ static void update_stale_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE
 {
   struct fnode *a;
   for (a = fileinv->next; a != fileinv; a = a->next) {
-    /* deepest directories first */
-
     if (a->is_dir) {
-      update_stale_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
+      update_stale_files(ctrl_con, dir_children(a), journal);
     } else {
-      /* it's a file */
-      if ((a->path_peer != NULL) && (a->x.file.content_peer == NULL)) {
+      if (is_stale_file(a)) {
         update_file(ctrl_con, a, journal);
-      } else {
-        /* nothing to do. */
       }
     }
   }
@@ -464,8 +655,11 @@ static void upload_for_real(struct FTP *ctrl_con, struct fnode *localinv, struct
   }
 
   remove_dead_files(ctrl_con, fileinv, journal);
+  create_new_directories(ctrl_con, localinv, journal);
+  rename_moved_files(ctrl_con, localinv, journal);
   add_new_files(ctrl_con, localinv, journal);
   update_stale_files(ctrl_con, fileinv, journal);
+  remove_old_directories(ctrl_con, fileinv, journal);
 
   return;
 

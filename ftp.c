@@ -547,6 +547,23 @@ int ftp_delete(struct FTP *ctrl_con, const char *path)/*{{{*/
   return status_map(status);
 }
 /*}}}*/
+int ftp_rename(struct FTP *ctrl_con, const char *from_path, const char *to_path)/*{{{*/
+{
+  int status;
+  put_cmd(ctrl_con, "RNFR", from_path);
+  status = read_status(ctrl_con);
+  if (verbose) {
+    printf("Got %d from RNFR command\n", status);
+  }
+  if (status >= 500) return;
+  put_cmd(ctrl_con, "RNTO", from_path);
+  status = read_status(ctrl_con);
+  if (verbose) {
+    printf("Got %d from RNTO command\n", status);
+  }
+  return status_map(status);
+}
+/*}}}*/
 int ftp_rmdir(struct FTP *ctrl_con, const char *dir_path)/*{{{*/
 {
   int status;

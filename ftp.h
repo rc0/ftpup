@@ -29,8 +29,8 @@ extern int ftp_read(struct FTP *,
                     const char *filename); /* local path to write data to */
 
 extern int ftp_rename(struct FTP *,
-                      const char *old_path, /* old remote path */
-                      const char *new_path); /* new remote path */
+                      const char *from_path, /* old remote path */
+                      const char *to_path); /* new remote path */
 
 /* Return 1 for success, 0 for failure */
 extern int ftp_delete(struct FTP *,
