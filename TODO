@@ -17,7 +17,7 @@
 
 - md5 stuff, rename detection + upload (chains + rings of renames etc)
 
-- when mtime is zero from fileinv, update with mtime from corresponding localinv
+- when mtime is zero from fileinv, update with mtime from corresponding localinv (? do we want this?)
 
 - globally configurable ignore lists (with globbing)
 

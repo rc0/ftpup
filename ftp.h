@@ -50,6 +50,9 @@ extern int ftp_lsdir(struct FTP *,
                      struct FTP_stat **file_data,
                      int *nfiles);
 
+extern int ftp_names(struct FTP *ctrl_con, const char *dir_path,
+              char ***names, int *n_names);
+
 /* arch-tag: 522f1f64-1ee6-4e68-be91-ffaab000be9c
 */
 

@@ -444,6 +444,71 @@ static void append_file(struct file_list *fl, const char *name, int size, int pe
 }
 /*}}}*/
 
+int ftp_names(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
+              char ***names, int *n_names)
+{
+  /* hack. */
+  char *tnames[1024];
+  int N;
+  int data_fd;
+  int i;
+  int status;
+  FILE *in;
+  char line[4096];
+
+  if (ctrl_con->active) {
+    setup_active_data_con(ctrl_con);
+  } else {
+    data_fd = open_passive_data_con(ctrl_con);
+  }
+
+  put_cmd(ctrl_con, "NLST", dir_path);
+  status = read_status(ctrl_con);
+  if (verbose) {
+    printf("Got status %d after NLST %s\n", status, dir_path);
+  }
+
+  N = 0;
+
+  if (status == 150) {
+    if (ctrl_con->active) {
+      data_fd = open_active_data_con(ctrl_con);
+    }
+
+    in = fdopen(data_fd, "rb");
+    while (fgets(line, sizeof(line), in)) {
+      int len;
+      len = strlen(line);
+      line[len-1] = '\0';
+      if (N >= 1024) {
+        fprintf(stderr, "Array bounds exceeded in ftp_names, dir=%s\n", dir_path);
+        exit(1);
+      }
+      tnames[N++] = new_string(line);
+    }
+
+    fclose(in);
+    /* might need more actions to close an active connection? */
+    status = read_status(ctrl_con);
+    if (verbose) {
+      printf("Got status %d after NLST %s data transfer\n", status, dir_path);
+    }
+  }
+
+  if (N > 0) {
+    *names = new_array(char *, N);
+    for (i = 0; i < N; i++) {
+      (*names)[i] = tnames[i];
+    }
+  } else {
+    *names = NULL;
+  }
+  *n_names = N;
+
+  return 0;
+}
+/*}}}*/
+
 int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
               struct FTP_stat **file_data,
               int *n_files)
