@@ -628,6 +628,25 @@ int ftp_mkdir(struct FTP *ctrl_con, const char *dir_path)/*{{{*/
   return status_map(status);
 }
 /*}}}*/
+int ftp_binary(struct FTP *ctrl_con)/*{{{*/
+{
+  /* switch connection to binary. */
+  int status;
+
+  put_cmd(ctrl_con, "TYPE I", NULL);
+  status = read_status(ctrl_con);
+  if (verbose) {
+    printf("Got status %d for TYPE I command\n");
+  }
+
+  if (status >= 400) {
+    fprintf(stderr, "Couldn't set TYPE to I\n");
+    exit(1);
+  }
+
+  return 0;
+}
+/*}}}*/
 int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_path)/*{{{*/
 {
   int data_fd;

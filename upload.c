@@ -374,6 +374,7 @@ int upload(const char *password, int is_dummy_run, const char *listing_file, int
     if (rp.remote_root) {
       ftp_cwd(ctrl_con, rp.remote_root);
     }
+    ftp_binary(ctrl_con);
     upload_for_real(ctrl_con, localinv, fileinv, listing_file);
     ftp_close(ctrl_con);
   }
