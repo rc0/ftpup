@@ -106,6 +106,137 @@ static void upload_dummy(struct fnode *localinv, struct fnode *fileinv)/*{{{*/
   print_unique(fileinv);
 }
 /*}}}*/
+
+static void remove_directory(struct FTP *ctrl_con, struct fnode *dir, FILE *journal)/*{{{*/
+{
+  int status;
+
+  /* FIXME : create magic symlink to track aborted FTP ops */
+  if ((struct fnode *) &dir->x.dir.next != dir->x.dir.next) {
+    fprintf(stderr, "Botched invariant for %s in remove_directory\n", dir->path);
+    exit(2);
+  }
+
+  status = ftp_rmdir(ctrl_con, dir->path);
+  if (status) {
+    fprintf(journal, "Z %s\n", dir->path);
+    fflush(journal);
+    printf("Removed remote directory %s\n", dir->path);
+  } else {
+    fprintf(stderr, "FAILED TO REMOVE DIRECTORY %s FROM REMOTE SIZE, ABORTING\n", dir->path);
+    exit(1);
+  }
+}
+/*}}}*/
+static void remove_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
+{
+  int status;
+  /* FIXME : create magic symlink to track aborted FTP ops */
+  status = ftp_delete(ctrl_con, file->path);
+  if (status) {
+    fprintf(journal, "Z %s\n", file->path);
+    fflush(journal);
+    printf("Removed remote file %s\n", file->path);
+  } else {
+    fprintf(stderr, "FAILED TO REMOVE FILE %s FROM REMOTE SIZE, ABORTING\n", file->path);
+    exit(1);
+  }
+}
+/*}}}*/
+
+static void remove_dead_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE *journal)/*{{{*/
+{
+  /* Start from the deepest directory. */
+  struct fnode *a, *next_a;
+  for (a = fileinv->next; a != fileinv; a = next_a) {
+    if (a->is_dir) {
+      remove_dead_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
+    }
+    if (a->is_unique) {
+      if (a->is_dir) {
+        remove_directory(ctrl_con, a, journal);
+      } else {
+        remove_file(ctrl_con, a, journal);
+      }
+    }
+    /* Do it this way so we can potentially handle freeing a from the list. */
+    next_a = a->next;
+  }
+
+}
+/*}}}*/
+
+static void create_directory(struct FTP *ctrl_con, struct fnode *dir, FILE *journal)/*{{{*/
+{
+  int status;
+  /* FIXME : magic symlink */
+  status = ftp_mkdir(ctrl_con, dir->path);
+  if (status) {
+    fprintf(journal, "D                   %s\n", dir->path);
+    fflush(journal);
+    printf("Created new remote directory %s\n", dir->path);
+  } else {
+    fprintf(stderr, "FAILED TO CREATE DIRECTORY %s ON REMOTE SIZE, ABORTING\n", dir->path);
+    exit(1);
+  }
+}
+/*}}}*/
+static void create_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
+{
+  int status;
+  /* FIXME : magic symlink */
+  status = ftp_write(ctrl_con, file->path, file->path);
+  /* FIXME : md5sum */
+  if (status) {
+    fprintf(journal, "F %8d %08lx %s\n", file->x.file.size, file->x.file.mtime, file->path);
+    fflush(journal);
+    printf("Created new remote file %s\n", file->path);
+  } else {
+    fprintf(stderr, "FAILED TO CREATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);
+    exit(1);
+  }
+}
+/*}}}*/
+static void add_new_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *journal)/*{{{*/
+{
+  struct fnode *a;
+  for (a = localinv->next; a != localinv; a = a->next) {
+    /* Start with shallowest stuff */
+    if (a->is_unique) {
+      if (a->is_dir) {
+        create_directory(ctrl_con, a, journal);
+      } else {
+        create_file(ctrl_con, a, journal);
+      }
+    }
+    if (a->is_dir) {
+      add_new_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
+    }
+  }
+}
+/*}}}*/
+
+static void upload_for_real(struct FTP *ctrl_con, struct fnode *localinv, struct fnode *fileinv, const char *listing_file)/*{{{*/
+{
+  FILE *journal;
+
+  journal = fopen(listing_file, "a");
+  if (!journal) {
+    fprintf(stderr, "Couldn't open %s to append updates\n", listing_file);
+    exit(1);
+  }
+
+  remove_dead_files(ctrl_con, fileinv, journal);
+  add_new_files(ctrl_con, localinv, journal);
+#if 0
+  update_stale_files(ctrl_con, fileinv, journal);
+#endif
+
+  return;
+
+}
+/*}}}*/
+
 /* Assume already in correct local directory. */
 int upload(const char *hostname, const char *username, const char *password, const char *remote_root, int is_dummy_run, const char *listing_file)/*{{{*/
 {
@@ -113,7 +244,7 @@ int upload(const char *hostname, const char *username, const char *password, con
   struct fnode *fileinv;
 
   fileinv = make_fileinv(listing_file);
-  localinv = make_localinv();
+  localinv = make_localinv(listing_file);
 
 #if 0
   printf("LOCAL INVENTORY:\n");
@@ -127,7 +258,10 @@ int upload(const char *hostname, const char *username, const char *password, con
   if (is_dummy_run) {
     upload_dummy(localinv, fileinv);
   } else {
-
+    struct FTP *ctrl_con;
+    ctrl_con = ftp_open(hostname, username, password);
+    upload_for_real(ctrl_con, localinv, fileinv, listing_file);
+    ftp_close(ctrl_con);
   }
 
   return;

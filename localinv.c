@@ -12,6 +12,8 @@
 #include "invent.h"
 #include "memory.h"
 
+/* FIXME : do this properly. */
+static const char *local_to_avoid = NULL;
 
 static void add_fnode(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
 {
@@ -49,6 +51,7 @@ static int starts_with(const char *name, const char *pattern)/*{{{*/
 }
 /*}}}*/
 static int reject_name(const char *name) {/*{{{*/
+  if (!strcmp(name, local_to_avoid)) return 1;
   if (ends_with(name, ".php")) return 1;
   if (ends_with(name, ".php3")) return 1;
   if (ends_with(name, ".bak")) return 1;
@@ -118,10 +121,11 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
   closedir(d);
 }
 /*}}}*/
-struct fnode *make_localinv(void)/*{{{*/
+struct fnode *make_localinv(const char *to_avoid)/*{{{*/
 {
   struct fnode *result;
 
+  local_to_avoid = to_avoid;
   result = new(struct fnode);
   result->next = result->prev = result;
   scan_one_dir(".", result);
@@ -129,17 +133,32 @@ struct fnode *make_localinv(void)/*{{{*/
 };
 /*}}}*/
 
-void print_inventory(struct fnode *a)/*{{{*/
+static void inner_print_inventory(struct fnode *a, FILE *out)/*{{{*/
 {
   struct fnode *b;
+
   for (b = a->next; b != a; b = b->next) {
     if (b->is_dir) {
-      printf("D                   %s\n", b->path);
-      print_inventory((struct fnode *) &b->x.dir.next);
+      fprintf(out ? out : stdout, "D                   %s\n", b->path);
+      inner_print_inventory((struct fnode *) &b->x.dir.next, out);
     } else {
-      printf("F %8d %08lx %s\n", b->x.file.size, b->x.file.mtime, b->path);
+      fprintf(out ? out : stdout, "F %8d %08lx %s\n", b->x.file.size, b->x.file.mtime, b->path);
     }
   }
+}
+/*}}}*/
+
+void print_inventory(struct fnode *a, const char *to_file)/*{{{*/
+{
+  FILE *out;
+  if (to_file) {
+    out = fopen(to_file, "w");
+  } else {
+    out = NULL;
+  }
+
+  inner_print_inventory(a, out);
+  if (out) fclose(out);
 }
 /*}}}*/
 

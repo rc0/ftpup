@@ -1,7 +1,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
+#include "invent.h"
 #include "memory.h"
 
 int verbose = 0;
@@ -76,10 +78,13 @@ int main (int argc, char **argv) {
     password = new_string(password);
   }
 
+  if (!listing_file) {
+    listing_file = "@@LISTING@@";
+  }
   
   if (do_remote_inv) {
     reminv = make_remoteinv(hostname, username, password, remote_root);
-    print_inventory(reminv);
+    print_inventory(reminv, listing_file);
   } else if (do_lint) {
   } else if (do_upload) {
     upload(hostname, username, password, remote_root, 0, listing_file);

@@ -1,0 +1,23 @@
+- When building inventory, put subdirectories before files, so that upload is
+  done depth first.  (This will help with getting .listing files updated after
+  the files they list.)
+
+- Treat mtime zero as a wildcard when doing the initial matching.
+
+- Don't try to upload .swp.
+
+- Add is_stale stuff.
+- Upload changed files
+
+- md5 stuff, rename detection + upload
+
+- write out clean journal before starting upload process
+
+- test against more ftp servers
+
+- active data connection
+
+- show %done for file upload to give more comfort for slow servers.
+
+# arch-tag: c7d95446-c4b1-48a8-920c-dc8ec90229c6
+

@@ -421,6 +421,79 @@ int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
 }
 /*}}}*/
 
+static int status_map(int status) {/*{{{*/
+  if ((status >= 200) && (status < 300)) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+/*}}}*/
+int ftp_delete(struct FTP *ctrl_con, const char *path)/*{{{*/
+{
+  int status;
+  put_cmd(ctrl_con, "DELE", path);
+  status = read_status(ctrl_con);
+  return status_map(status);
+}
+/*}}}*/
+int ftp_rmdir(struct FTP *ctrl_con, const char *dir_path)/*{{{*/
+{
+  int status;
+  put_cmd(ctrl_con, "RMD", dir_path);
+  status = read_status(ctrl_con);
+  return status_map(status);
+}
+/*}}}*/
+int ftp_mkdir(struct FTP *ctrl_con, const char *dir_path)/*{{{*/
+{
+  int status;
+  put_cmd(ctrl_con, "MKD", dir_path);
+  status = read_status(ctrl_con);
+  return status_map(status);
+}
+/*}}}*/
+int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_path)/*{{{*/
+{
+  int data_fd;
+  FILE *local, *remote;
+  int status, mapped_status;
+  char buffer[4096];
+  int n;
+
+  local = fopen(local_path, "rb");
+  if (!local) {
+    fprintf(stderr, "Could not open local file %s\n", local_path);
+    return 0;
+  }
+
+  data_fd = open_passive_data_con(ctrl_con);
+  remote = fdopen(data_fd, "w");
+  put_cmd(ctrl_con, "STOR", remote_path);
+  status = read_status(ctrl_con);
+  if (verbose) {
+    printf("Got status %d after STOR %s->%s\n", status, local_path, remote_path);
+  }
+  if (status >= 400) return 0;
+
+  while (1) {
+    n = fread(buffer, 1, 4096, local);
+    if (!n) break;
+    fwrite(buffer, 1, n, remote);
+  }
+
+  fclose(remote);
+  fclose(local);
+
+  status = read_status(ctrl_con);
+  if (verbose) {
+    printf("Got status %d after STOR %s->%s\n", status, local_path, remote_path);
+  }
+
+  return status_map(status);
+}
+/*}}}*/
+
 /* arch-tag: 4b5f74ca-8738-4367-ad53-12185fb7bd85
 */
 

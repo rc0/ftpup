@@ -20,7 +20,7 @@ extern int ftp_close(struct FTP *);
 extern int ftp_cwd(struct FTP *, const char *new_root_dir);
 
 extern int ftp_write(struct FTP *,
-                     const char *filename, /* local path */
+                     const char *local_path, /* local path */
                      const char *remote_path); /* path on remote server */
 
 extern int ftp_read(struct FTP *,
@@ -31,13 +31,13 @@ extern int ftp_rename(struct FTP *,
                       const char *old_path, /* old remote path */
                       const char *new_path); /* new remote path */
 
+/* Return 1 for success, 0 for failure */
 extern int ftp_delete(struct FTP *,
                       const char *remote_path);
-
-extern int ftp_mkdir(struct FTP *,
+extern int ftp_rmdir(struct FTP *,
                      const char *remote_path);
 
-extern int ftp_rmdir(struct FTP *,
+extern int ftp_mkdir(struct FTP *,
                      const char *remote_path);
 
 extern int ftp_stat(struct FTP *,

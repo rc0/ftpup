@@ -34,11 +34,11 @@ struct fnode {/*{{{*/
 /*}}}*/
 
 /* Assume already in the right directory at the point this is called. */
-struct fnode *make_localinv(void);
+struct fnode *make_localinv(const char *to_avoid);
 struct fnode *make_fileinv(const char *listing);
 struct fnode *make_remoteinv(const char *hostname, const char *username, const char *password, const char *remote_root);
 
-void print_inventory(struct fnode *a);
+void print_inventory(struct fnode *a, const char *to_file);
 #endif /* INVENT_H */
 
 /* arch-tag: c12bf55b-97e2-4ffe-9092-2345b28d57c9
