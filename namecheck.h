@@ -9,6 +9,7 @@ enum nc_result {
 
 struct namecheck;
 
+extern struct namecheck *make_namecheck_dir(const char *dir, const char *filename);
 extern struct namecheck *make_namecheck(char *filename);
 extern void free_namecheck(struct namecheck *);
 

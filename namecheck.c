@@ -115,7 +115,23 @@ struct namecheck *make_namecheck(char *filename)/*{{{*/
   return result;
 
 }/*}}}*/
+struct namecheck *make_namecheck_dir(const char *dir, const char *filename)/*{{{*/
+{
+  int l1, l2;
+  char *temp;
+  struct namecheck *result;
 
+  l1 = strlen(dir);
+  l2 = strlen(filename);
+  temp = new_array(char, l1 + l2 + 2);
+  strcpy(temp, dir);
+  strcat(temp, "/");
+  strcat(temp, filename);
+  result = make_namecheck(temp);
+  free(temp);
+  return result;
+}
+/*}}}*/
 void free_namecheck(struct namecheck *nc)/*{{{*/
 {
   struct pattern *p, *np;

@@ -63,7 +63,7 @@ static void scan_one_dir(const char *path, struct namecheck *global_nc, struct f
   pathlen = strlen(path);
 
   /* This returns null if the file isn't there. */
-  local_nc = make_namecheck("@@UPLOAD@@");
+  local_nc = make_namecheck_dir(path, "@@UPLOAD@@");
   d = opendir(path);
   if (!d) return; /* tough */
   while ((de = readdir(d))) {
