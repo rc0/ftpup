@@ -141,16 +141,13 @@ static void remove_directory(struct FTP *ctrl_con, struct fnode *dir, FILE *jour
   int status;
 
   /* FIXME : create magic symlink to track aborted FTP ops */
-  if ((struct fnode *) &dir->x.dir.next != dir->x.dir.next) {
-    fprintf(stderr, "Botched invariant for %s in remove_directory\n", dir->path);
-    exit(2);
-  }
 
   status = ftp_rmdir(ctrl_con, dir->path);
   if (status) {
     fprintf(journal, "Z %s\n", dir->path);
     fflush(journal);
     printf("Removed remote directory %s\n", dir->path);
+    fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO REMOVE DIRECTORY %s FROM REMOTE SIZE, ABORTING\n", dir->path);
     exit(1);
@@ -166,6 +163,7 @@ static void remove_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
     fprintf(journal, "Z %s\n", file->path);
     fflush(journal);
     printf("Removed remote file %s\n", file->path);
+    fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO REMOVE FILE %s FROM REMOTE SIZE, ABORTING\n", file->path);
     exit(1);
@@ -204,6 +202,7 @@ static void create_directory(struct FTP *ctrl_con, struct fnode *dir, FILE *jour
     fprintf(journal, "D                   %s\n", dir->path);
     fflush(journal);
     printf("Created new remote directory %s\n", dir->path);
+    fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO CREATE DIRECTORY %s ON REMOTE SIZE, ABORTING\n", dir->path);
     exit(1);
@@ -215,12 +214,14 @@ static void create_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
   int status;
   /* FIXME : magic symlink */
   printf("Starting to create remote file %s (%d bytes)\r", file->path, file->x.file.size);
+  fflush(stdout);
   status = ftp_write(ctrl_con, file->path, file->path);
   /* FIXME : md5sum */
   if (status) {
     fprintf(journal, "F %8d %08lx %s\n", file->x.file.size, file->x.file.mtime, file->path);
     fflush(journal);
     printf("Done creating new remote file %s (%d bytes)  \n", file->path, file->x.file.size);
+    fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO CREATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);
     exit(1);
@@ -254,12 +255,14 @@ static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
   /* ? do we need to delete the file first for safety (according to STOR in
    * RFC959, no.) */
   printf("Starting to update %s (%d bytes)\r", file->path, local_peer->x.file.size);
+  fflush(stdout);
   status = ftp_write(ctrl_con, file->path, file->path);
   /* FIXME : md5sum */
   if (status) {
     fprintf(journal, "F %8d %08lx %s\n", local_peer->x.file.size, local_peer->x.file.mtime, file->path);
     fflush(journal);
     printf("Done updating remote file %s (%d bytes)  \n", file->path, local_peer->x.file.size);
+    fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO UPDATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);
     exit(1);
@@ -313,13 +316,6 @@ int upload(const char *hostname, const char *username, const char *password, con
 
   fileinv = make_fileinv(listing_file);
   localinv = make_localinv(listing_file);
-
-#if 0
-  printf("LOCAL INVENTORY:\n");
-  print_inventory(localinv);
-  printf("\n\nREMOTE INVENTORY:\n");
-  print_inventory(fileinv);
-#endif
   
   reconcile(fileinv, localinv);
 
@@ -328,6 +324,9 @@ int upload(const char *hostname, const char *username, const char *password, con
   } else {
     struct FTP *ctrl_con;
     ctrl_con = ftp_open(hostname, username, password);
+    if (remote_root) {
+      ftp_cwd(ctrl_con, remote_root);
+    }
     upload_for_real(ctrl_con, localinv, fileinv, listing_file);
     ftp_close(ctrl_con);
   }

@@ -19,6 +19,8 @@ static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x
 
   dirlen = strlen(path);
 
+  printf("Scanning directory %s\n", path);
+  fflush(stdout);
   ftp_lsdir(ctrl_con, path, &files, &n_files);
   for (i=0; i<n_files; i++) {
     if (!strcmp(files[i].name, ".")) continue;
@@ -54,6 +56,13 @@ static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x
       nfn->x.file.mtime = 0;
       nfn->x.file.peer = NULL;
       add_fnode_at_end(x, nfn);
+
+      /* If file is not writable, update the perms */
+#if 0
+      if ((files[i].perms & 0200) == 0) {
+        ftp_chmod(ctrl_con, full_path, 0644);
+      }
+#endif
     }
   }
   free(files);

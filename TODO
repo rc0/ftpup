@@ -1,4 +1,9 @@
-- when building remote inventory, detect lack of write perm and fix.
+- when building remote inventory, detect lack of write perm and fix. (? do we need this?)
+
+- truncate paths to just the right-most portion for comfort messages
+
+- comfort messages need to include how many files are done v how many to go and
+  an idea of total amount of date done and to go also.
 
 - remember hostname, username and remote root details in listing file.  Should
   only have to enter them when doing the -R option the first time.
