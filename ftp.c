@@ -245,7 +245,7 @@ static void setup_active_data_con(struct FTP *ctrl_con)/*{{{*/
   int status;
   unsigned long ip_addr;
   unsigned short port;
-  int listen_fd, accept_fd;
+  int listen_fd;
   char port_string[24];
 
   ctrl_sock_addr_len = sizeof(struct sockaddr_in);
@@ -313,7 +313,6 @@ static int open_active_data_con(struct FTP *ctrl_con)/*{{{*/
 {
   struct sockaddr_in peer_sock_addr;
   int peer_sock_addr_len;
-  int status;
   unsigned long ip_addr;
   unsigned short port;
   int accept_fd;
@@ -331,33 +330,6 @@ static int open_active_data_con(struct FTP *ctrl_con)/*{{{*/
 }
 /*}}}*/
 
-static void borked_delete(struct FTP *ctrl_con)/*{{{*/
-{
-  int status;
-  put_cmd(ctrl_con, "DELE", "loads_a_crap");
-  status = read_status(ctrl_con);
-  if (verbose) {
-    printf("Got %d from DELE comamnd\n", status);
-  }
-}
-/*}}}*/
-static void borked_rename(struct FTP *ctrl_con)/*{{{*/
-{
-  int status;
-  put_cmd(ctrl_con, "RNFR", "loads_a_crap");
-  status = read_status(ctrl_con);
-  if (verbose) {
-    printf("Got %d from RNFR comamnd\n", status);
-  }
-  if (status >= 500) return;
-  put_cmd(ctrl_con, "RNTO", "loads_a_money");
-  status = read_status(ctrl_con);
-  if (verbose) {
-    printf("Got %d from RNTO comamnd\n", status);
-  }
-
-}
-/*}}}*/
 int ftp_cwd(struct FTP *con, const char *new_root_dir)/*{{{*/
 {
   int status;
@@ -369,13 +341,8 @@ int ftp_cwd(struct FTP *con, const char *new_root_dir)/*{{{*/
   return 0;
 }
 /*}}}*/
-static void usage(void)/*{{{*/
-{
-  /* FIXME : display usage info. */
-}
-/*}}}*/
 
-struct file_list {
+struct file_list {/*{{{*/
   struct file_list *next;
   struct file_list *prev;
   char *name;
@@ -383,7 +350,7 @@ struct file_list {
   int perms;
   int is_dir;
 };
-
+/*}}}*/
 static void strip_termination(char *line)/*{{{*/
 {
   char *p;
@@ -394,7 +361,6 @@ static void strip_termination(char *line)/*{{{*/
 static void split_into_fields(char *line, char **fields, int *n_fields)/*{{{*/
 {
   char *p = line;
-  int i;
   *n_fields = 0;
   for (;;) {
     while (*p && isspace(*p)) {
@@ -656,9 +622,9 @@ int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_p
   
   int data_fd;
   FILE *local, *remote;
-  int status, mapped_status;
+  int status;
   char buffer[CHUNKSIZE];
-  int n, bytes_done, size;
+  int n, bytes_done;
   struct stat sb;
 
   local = fopen(local_path, "rb");
