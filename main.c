@@ -73,9 +73,11 @@ int main (int argc, char **argv) {
     exit(1);
   }
 
-  if (!password) {
-    password = getpass("PASSWORD: ");
-    password = new_string(password);
+  if (do_remote_inv || do_upload) {
+    if (!password) {
+      password = getpass("PASSWORD: ");
+      password = new_string(password);
+    }
   }
 
   if (!listing_file) {

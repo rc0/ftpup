@@ -55,6 +55,7 @@ static int reject_name(const char *name) {/*{{{*/
   if (ends_with(name, ".php")) return 1;
   if (ends_with(name, ".php3")) return 1;
   if (ends_with(name, ".bak")) return 1;
+  if (ends_with(name, ".swp")) return 1; /* vim swap files */
   if (ends_with(name, "~")) return 1;
   if (starts_with(name, "#")) return 1;
   if (!strcmp(name, ".xvpics")) return 1;
