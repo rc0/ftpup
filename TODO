@@ -2,14 +2,12 @@
   done depth first.  (This will help with getting .listing files updated after
   the files they list.)
 
-- Don't try to upload .swp.
-
 - remember hostname, username and remote root details in listing file.  Should
   only have to enter them when doing the -R option the first time.
 
 - write out clean journal before starting upload process
 
-- show %done for file upload to give more comfort for slow servers.
+- show %done for file upload to give more comfort for slow servers + start/finish messages
 
 - md5 stuff, rename detection + upload
 

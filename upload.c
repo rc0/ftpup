@@ -214,12 +214,13 @@ static void create_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
 {
   int status;
   /* FIXME : magic symlink */
+  printf("Starting to create remote file %s (%d bytes)\r", file->path, file->x.file.size);
   status = ftp_write(ctrl_con, file->path, file->path);
   /* FIXME : md5sum */
   if (status) {
     fprintf(journal, "F %8d %08lx %s\n", file->x.file.size, file->x.file.mtime, file->path);
     fflush(journal);
-    printf("Created new remote file %s\n", file->path);
+    printf("Done creating new remote file %s (%d bytes)  \n", file->path, file->x.file.size);
   } else {
     fprintf(stderr, "FAILED TO CREATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);
     exit(1);
@@ -248,16 +249,17 @@ static void add_new_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *jo
 static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
 {
   int status;
+  struct fnode *local_peer = file->x.file.peer;
   /* FIXME : magic symlink */
   /* ? do we need to delete the file first for safety (according to STOR in
    * RFC959, no.) */
+  printf("Starting to update %s (%d bytes)\r", file->path, local_peer->x.file.size);
   status = ftp_write(ctrl_con, file->path, file->path);
   /* FIXME : md5sum */
   if (status) {
-    struct fnode *local_peer = file->x.file.peer;
     fprintf(journal, "F %8d %08lx %s\n", local_peer->x.file.size, local_peer->x.file.mtime, file->path);
     fflush(journal);
-    printf("Updated remote file %s\n", file->path);
+    printf("Done updating remote file %s (%d bytes)  \n", file->path, local_peer->x.file.size);
   } else {
     fprintf(stderr, "FAILED TO UPDATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);
     exit(1);

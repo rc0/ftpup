@@ -87,12 +87,14 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   /* lookup */
   for (e = d->next; e != d; e = e->next) {
     if (!strcmp(e->name, tail)) {
-      fprintf(stderr, "In add_file for %s, this file already exists.\n", p);
-      exit(1);
+      /* Update parameters */
+      e->x.file.size = size;
+      e->x.file.mtime = mtime;
+      return;
     }
   }
 
-  /* add */
+  /* otherwise, add new entry */
   nfn = new(struct fnode);
   nfn->name = new_string(tail);
   nfn->path = new_string(p);
