@@ -12,6 +12,8 @@
 #include "ftp.h"
 #include "memory.h"
 
+extern int verbose;
+
 /* Private definition of opaque structure. */
 struct FTP {/*{{{*/
   int fd;   /* fd of the socket */
@@ -45,7 +47,9 @@ static char *read_line(struct FTP *con)/*{{{*/
         result = new_array(char, len+1);
         memcpy(result, con->readbuf, len);
         result[len] = 0;
-        printf("Got line [%s]\n", result);
+        if (verbose) {
+          printf("Got line [%s]\n", result);
+        }
         remain = con->bufptr - (p+2);
         if (remain > 0) {
           memmove(con->readbuf, p+2, remain);
@@ -110,6 +114,7 @@ struct FTP *ftp_open(const char *hostname, const char *username, const char *pas
   unsigned char *address0;
   unsigned long ip;
   int addrlen;
+  int status;
 
   result = new(struct FTP);
   result->bufptr = result->readbuf;
@@ -139,15 +144,26 @@ struct FTP *ftp_open(const char *hostname, const char *username, const char *pas
   }
 
   /* Read hello string */
-  printf("Got %d from hello string\n", read_status(result));
+  status = read_status(result);
+  if (verbose) {
+    printf("Got %d from hello string\n", status);
+  }
 
   put_cmd(result, "USER", username);
-  printf("Got %d from USER comamnd\n", read_status(result));
+  status = read_status(result);
+  if (verbose) {
+    printf("Got %d from USER comamnd\n", status);
+  }
   put_cmd(result, "PASS", password);
-  printf("Got %d from PASS comamnd\n", read_status(result));
-
+  status = read_status(result);
+  if (verbose) {
+    printf("Got %d from PASS comamnd\n", status);
+  }
+  if (status >= 500) {
+    fprintf(stderr, "Password authentication failed\n");
+    exit(1);
+  }
   return result;
-
 }
 /*}}}*/
 int ftp_close(struct FTP *con)/*{{{*/
@@ -158,7 +174,7 @@ int ftp_close(struct FTP *con)/*{{{*/
 }
 /*}}}*/
 
-static int open_data_con(struct FTP *ctrl_con)/*{{{*/
+int open_passive_data_con(struct FTP *ctrl_con)/*{{{*/
 {
   int status;
   char *line;
@@ -173,7 +189,9 @@ static int open_data_con(struct FTP *ctrl_con)/*{{{*/
   put_cmd(ctrl_con, "PASV", NULL);
   line = read_line(ctrl_con);
   status = get_status(line);
-  printf("Got status %d from PASV command\n", status);
+  if (verbose) {
+    printf("Got status %d from PASV command\n", status);
+  }
   if (status != 227) {
     fprintf(stderr, "Could not configure passive\n");
     exit(1);
@@ -187,7 +205,9 @@ static int open_data_con(struct FTP *ctrl_con)/*{{{*/
     sscanf(p+1, "%u,%u,%u,%u,%u,%u", &h0, &h1, &h2, &h3, &p0, &p1);
     host_ip = ((h0 & 0xff) << 24) | ((h1 & 0xff) << 16) | ((h2 & 0xff) << 8) | (h3 & 0xff);
     port = ((p0 & 0xff) << 8) | (p1 & 0xff);
-    printf("Host IP=%08lx port=%d\n", host_ip, port);
+    if (verbose) {
+      printf("Host IP=%08lx port=%d\n", host_ip, port);
+    }
 
     data_addr.sin_family = AF_INET;
     data_addr.sin_port = htons(port);
@@ -212,32 +232,14 @@ static int open_data_con(struct FTP *ctrl_con)/*{{{*/
 }
 /*}}}*/
 
-static void ftp_list(struct FTP *ctrl_con)/*{{{*/
-{
-  int data_fd;
-  int status;
-  FILE *in;
-  char line[1024];
-  data_fd = open_data_con(ctrl_con);
-  put_cmd(ctrl_con, "LIST", NULL);
-  status = read_status(ctrl_con);
-  in = fdopen(data_fd, "r");
-  while (fgets(line, sizeof(line), in)) {
-    char *p;
-    for (p=line; *p; p++) ;
-    for (p--; isspace(*p); p--) *p='\0';
-    printf("DATA: %s\n", line);
-  }
-  fclose(in);
-  status = read_status(ctrl_con);
-}
-/*}}}*/
 static void borked_delete(struct FTP *ctrl_con)/*{{{*/
 {
   int status;
   put_cmd(ctrl_con, "DELE", "loads_a_crap");
   status = read_status(ctrl_con);
-  printf("Got %d from DELE comamnd\n", status);
+  if (verbose) {
+    printf("Got %d from DELE comamnd\n", status);
+  }
 }
 /*}}}*/
 static void borked_rename(struct FTP *ctrl_con)/*{{{*/
@@ -245,20 +247,27 @@ static void borked_rename(struct FTP *ctrl_con)/*{{{*/
   int status;
   put_cmd(ctrl_con, "RNFR", "loads_a_crap");
   status = read_status(ctrl_con);
-  printf("Got %d from RNFR comamnd\n", status);
+  if (verbose) {
+    printf("Got %d from RNFR comamnd\n", status);
+  }
   if (status >= 500) return;
   put_cmd(ctrl_con, "RNTO", "loads_a_money");
   status = read_status(ctrl_con);
-  printf("Got %d from RNTO comamnd\n", status);
+  if (verbose) {
+    printf("Got %d from RNTO comamnd\n", status);
+  }
 
 }
 /*}}}*/
-static void change_directory(struct FTP *con, const char *new_root_dir)/*{{{*/
+int ftp_cwd(struct FTP *con, const char *new_root_dir)/*{{{*/
 {
   int status;
   put_cmd(con, "CWD", new_root_dir);
   status = read_status(con);
-  printf("Got %d from CWD comamnd\n", status);
+  if (verbose) {
+    printf("Got %d from CWD comamnd\n", status);
+  }
+  return 0;
 }
 /*}}}*/
 static void usage(void)/*{{{*/
@@ -274,7 +283,6 @@ struct file_list {
   int size;
   int perms;
   int is_dir;
-  int dir_done;
 };
 
 static void strip_termination(char *line)/*{{{*/
@@ -320,21 +328,15 @@ static void parse_perms(const char *field, int *perms, int *is_dir)/*{{{*/
             ((field[9] == 'x') ? (1<<0) : 0);
 }
 /*}}}*/
-static void append_file(struct file_list *fl, const char *dir, const char *name, int size, int perms, int is_dir)/*{{{*/
+static void append_file(struct file_list *fl, const char *name, int size, int perms, int is_dir)/*{{{*/
 {
-  int len;
   struct file_list *new_fl;
 
   new_fl = new(struct file_list);
-  len = strlen(dir) + strlen(name) + 1;
-  new_fl->name = new_array(char, len + 1);
-  strcpy(new_fl->name, dir);
-  strcat(new_fl->name, "/");
-  strcat(new_fl->name, name);
+  new_fl->name = new_string(name);
   new_fl->size = size;
   new_fl->perms = perms;
   new_fl->is_dir = is_dir;
-  new_fl->dir_done = 0;
   
   new_fl->next = fl;
   new_fl->prev = fl->prev;
@@ -344,35 +346,41 @@ static void append_file(struct file_list *fl, const char *dir, const char *name,
 }
 /*}}}*/
 
-static void add_to_inventory(struct FTP *ctrl_con, struct file_list *fl, const char *dir)/*{{{*/
+int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
+              struct FTP_stat **file_data,
+              int *n_files)
 {
-  int status, data_fd;
-  FILE *in;
+  int data_fd;
   char line[1024];
   char *fields[16];
   int n_fields;
+  struct file_list fl, *a, *next_a;
+  int N, i;
+  int status;
+  FILE *in;
 
-  printf("Doing add_to_inventory for %s\n", dir);
-  put_cmd(ctrl_con, "PWD", NULL);
-  status = read_status(ctrl_con);
-
-  data_fd = open_data_con(ctrl_con);
-  if (!strcmp(dir, ".")) {
+  fl.next = fl.prev = &fl;
+  
+  data_fd = open_passive_data_con(ctrl_con);
+  if (!strcmp(dir_path, ".")) {
     /* Otherwise SuperH's FTP server, for one, gets confused */
     put_cmd(ctrl_con, "LIST -a", NULL);
   } else {
-    put_cmd(ctrl_con, "LIST -a", dir);
+    put_cmd(ctrl_con, "LIST -a", dir_path);
   }
 
   status = read_status(ctrl_con);
-  printf("Got status %d after LIST %s\n", status, dir);
+  if (verbose) {
+    printf("Got status %d after LIST %s\n", status, dir_path);
+  }
+
+  N = 0;
   in = fdopen(data_fd, "rb");
   while (fgets(line, sizeof(line), in)) {
     int size;
     int perms, is_dir;
     char *name;
     strip_termination(line);
-    printf("ADD_TO_I : %s\n", line);
     /* Some servers (e.g. SuperH's one) report a total line at the start of the
      * listing. */
     if (!strncmp(line, "total", 5)) continue;
@@ -381,130 +389,37 @@ static void add_to_inventory(struct FTP *ctrl_con, struct file_list *fl, const c
       fprintf(stderr, "Didn't see expected number of fields\n");
       exit(1);
     }
-    /* Number of reported fields may vary, e.g. SuperH's server doesn't report
-     * both username and group, there's only one column there whose meaning I'm
-     * not sure of. */
     name = fields[n_fields - 1];
     size = atoi(fields[n_fields - 5]);
     parse_perms(fields[0], &perms, &is_dir);
     if (strcmp(name, ".") && strcmp(name, "..")) {
       /* Don't add . or .. entries to the list else it will recurse infinitely.
        * */
-      append_file(fl, dir, name, size, perms, is_dir);
+      ++N;
+      append_file(&fl, name, size, perms, is_dir);
     }
   }
+
   fclose(in);
+  /* might need more actions to close an active connection? */
   status = read_status(ctrl_con);
-  printf("Got status %d after LIST %s data transfer\n", status, dir);
-
-}
-/*}}}*/
-static struct file_list *make_inventory(struct FTP *ctrl_con)/*{{{*/
-{
-  /* List out what is already at the remote site.  Assume already CD'd to the
-   * 'root' on the remote site (e.g. /htdocs for force9) */
-
-  struct file_list *result = new(struct file_list);
-  struct file_list *a;
-
-  result->next = result->prev = result;
-  result->name = NULL;
-  result->size = result->perms = result->is_dir = 0;
-
-  add_to_inventory(ctrl_con, result, ".");
-  for (a = result->next; a != result; a = a->next) {
-    if (a->is_dir && !a->dir_done) {
-      add_to_inventory(ctrl_con, result, a->name);
-      a->dir_done = 1;
-    }
-  }
-
-  /* print out; */
-  for (a = result->next; a != result; a = a->next) {
-    printf("%c %8d %03o %s\n",
-           a->is_dir ? 'D' : 'F',
-           a->size,
-           a->perms,
-           a->name);
+  if (verbose) {
+    printf("Got status %d after LIST %s data transfer\n", status, dir_path);
   }
   
-  return result;
+  /* Map to array */
+  *n_files = N;
+  *file_data = new_array(struct FTP_stat, N);
+  for (i=0, a = fl.next; i < N; i++, a = next_a) {
+    (*file_data)[i].is_dir = a->is_dir;
+    (*file_data)[i].size = a->size;
+    (*file_data)[i].perms = a->perms;
+    (*file_data)[i].name = a->name;
+    next_a = a->next;
+    free(a);
+  }
 }
 /*}}}*/
-
-#ifdef TEST
-int main (int argc, char **argv) {
-  struct FTP *foo;
-  int data_fd;
-  char *hostname;
-  char *username;
-  char *password;
-  char *remote_root;
-
-  hostname = NULL;
-  username = NULL;
-  password = NULL;
-  remote_root = NULL;
-
-  while (++argv, --argc) {
-    if ((*argv)[0] == '-') {
-      if (!strcmp(*argv, "-u")) {
-        --argc, ++argv;
-        username = *argv;
-      } else if (!strcmp(*argv, "-p")) {
-        --argc, ++argv;
-        password = *argv;
-      } else if (!strcmp(*argv, "-r")) {
-        --argc, ++argv;
-        remote_root = *argv;
-      } else if (!strcmp(*argv, "-h") || !strcmp(*argv, "--help")) {
-        usage();
-        exit(0);
-      } else {
-        fprintf(stderr, "Unrecognized option %s\n", *argv);
-        exit(2);
-      }
-    } else {
-      hostname = *argv;
-    }
-  }
-
-  if (!hostname) {
-    fprintf(stderr, "ERROR: No hostname specified\n");
-    exit(2);
-  }
-
-  if (!username) {
-    fprintf(stderr, "ERROR: No username specified\n");
-    exit(2);
-  }
-
-  if (!remote_root) {
-    fprintf(stderr, "WARNING: No remote root specified\n");
-  }
-
-  if (!password) {
-    password = getpass("PASSWORD: ");
-    password = new_string(password);
-  }
-  
-  foo = ftp_open(hostname, username, password);
-  if (remote_root) {
-    change_directory(foo, remote_root);
-  }
-#if 0
-  borked_rename(foo);
-  borked_delete(foo);
-#endif
-#if 0
-  ftp_list(foo);
-#endif
-#if 1
-  make_inventory(foo);
-#endif
-  return 0;
-}
-#endif
 
 /* arch-tag: 4b5f74ca-8738-4367-ad53-12185fb7bd85
 */

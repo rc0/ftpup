@@ -1,13 +1,10 @@
 CC=gcc
 CFLAGS=-g
 
-OBJ := ftpup.o
+OBJ := main.o localinv.o fileinv.o remoteinv.o ftp.o upload.o
 
 ftpup : $(OBJ)
 	$(CC) $(CFLAGS) -o ftpup $(OBJ)
-
-ftptest : ftp.c
-	$(CC) $(CFLAGS) -o ftptest -DTEST ftp.c
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c $< -o $@

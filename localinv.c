@@ -22,6 +22,42 @@ static void add_fnode(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
 }
 /*}}}*/
 
+/* FIXME : this stuff needs to be user-configurable eventually. */
+static int ends_with(const char *name, const char *pattern) {/*{{{*/
+  int len, patlen;
+  len = strlen(name);
+  patlen = strlen(pattern);
+  if (len > patlen) {
+    if (!strcmp(name+len-patlen, pattern)) {
+      return 1;
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+/*}}}*/
+static int starts_with(const char *name, const char *pattern)/*{{{*/
+{
+  int patlen = strlen(pattern);
+  if (!strncmp(name, pattern, patlen)) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+/*}}}*/
+static int reject_name(const char *name) {/*{{{*/
+  if (ends_with(name, ".php")) return 1;
+  if (ends_with(name, ".php3")) return 1;
+  if (ends_with(name, ".bak")) return 1;
+  if (ends_with(name, "~")) return 1;
+  if (starts_with(name, "#")) return 1;
+  if (!strcmp(name, ".xvpics")) return 1;
+  return 0;
+}
+/*}}}*/
 static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
 {
   /* a is the list onto which the new entries are appended. */
@@ -39,6 +75,7 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
     int namelen, totallen;
     if (!strcmp(de->d_name, ".")) continue;
     if (!strcmp(de->d_name, "..")) continue;
+    if (reject_name(de->d_name)) continue;
 
     /* FIXME : Need some glob handling here to reject file patterns that the
      * user doesn't want to push. */
@@ -97,11 +134,10 @@ void print_inventory(struct fnode *a)/*{{{*/
   struct fnode *b;
   for (b = a->next; b != a; b = b->next) {
     if (b->is_dir) {
-      printf("D %s %s\n", b->name, b->path);
+      printf("D                   %s\n", b->path);
       print_inventory((struct fnode *) &b->x.dir.next);
     } else {
-      printf("F %8d %08lx %s %s\n", b->x.file.size, b->x.file.mtime,
-             b->name, b->path);
+      printf("F %8d %08lx %s\n", b->x.file.size, b->x.file.mtime, b->path);
     }
   }
 }

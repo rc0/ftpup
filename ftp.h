@@ -5,8 +5,10 @@
 struct FTP;
 
 struct FTP_stat {
-  /* TBD what information we can extract to put here. */
-  int pad;
+  int is_dir;
+  int perms;
+  size_t size;
+  char *name;
 };
 
 extern struct FTP *ftp_open(const char *host,
@@ -14,6 +16,8 @@ extern struct FTP *ftp_open(const char *host,
                             const char *password);
 
 extern int ftp_close(struct FTP *);
+
+extern int ftp_cwd(struct FTP *, const char *new_root_dir);
 
 extern int ftp_write(struct FTP *,
                      const char *filename, /* local path */

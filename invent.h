@@ -15,7 +15,6 @@ struct fnode {/*{{{*/
 
   char *name; /* name within parent directory */
   char *path; /* complete path from top of tree */
-  int is_indeterminate; /* remote : unknown state of remote file */
   int is_dir;
   int is_unique; /* 1 if only in this tree, 0 if in peer too. */
 
@@ -36,6 +35,8 @@ struct fnode {/*{{{*/
 
 /* Assume already in the right directory at the point this is called. */
 struct fnode *make_localinv(void);
+struct fnode *make_fileinv(const char *listing);
+struct fnode *make_remoteinv(const char *hostname, const char *username, const char *password, const char *remote_root);
 
 void print_inventory(struct fnode *a);
 #endif /* INVENT_H */
