@@ -1,7 +1,9 @@
 CC=gcc
 CFLAGS=-g -Wall
 
-OBJ := main.o localinv.o fileinv.o remoteinv.o ftp.o upload.o
+OBJ := main.o localinv.o fileinv.o remoteinv.o \
+    namecheck.o \
+    ftp.o upload.o
 
 ftpup : $(OBJ)
 	$(CC) $(CFLAGS) -o ftpup $(OBJ)

@@ -10,10 +10,8 @@
 
 #include "ftp.h"
 #include "invent.h"
+#include "namecheck.h"
 #include "memory.h"
-
-/* FIXME : do this properly. */
-static const char *local_to_avoid = NULL;
 
 void add_fnode_at_end(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
 {
@@ -33,52 +31,39 @@ void add_fnode_at_start(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
 /*}}}*/
 
 /* FIXME : this stuff needs to be user-configurable eventually. */
-static int ends_with(const char *name, const char *pattern) {/*{{{*/
-  int len, patlen;
-  len = strlen(name);
-  patlen = strlen(pattern);
-  if (len > patlen) {
-    if (!strcmp(name+len-patlen, pattern)) {
-      return 1;
-    } else {
-      return 0;
+static int reject_name(const char *name, struct namecheck *global_nc, struct namecheck *local_nc) {/*{{{*/
+  enum nc_result ncr;
+  if (local_nc) {
+    ncr = lookup_namecheck(local_nc, name);
+    if (ncr == NC_PASS)      return 0;
+    else if (ncr == NC_FAIL) return 1;
+  }
+  if (global_nc) {
+    ncr = lookup_namecheck(global_nc, name);
+    if (ncr == NC_PASS)      return 0;
+    else if (ncr == NC_FAIL) return 1;
+    else {
+      fprintf(stderr, "Filename <%s> not matched by [GLOBAL_]UPLOAD file rules\n", name);
+      exit(1);
     }
   } else {
+    /* With no control files, default to accepting every file */
     return 0;
   }
 }
 /*}}}*/
-static int starts_with(const char *name, const char *pattern)/*{{{*/
-{
-  int patlen = strlen(pattern);
-  if (!strncmp(name, pattern, patlen)) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
-/*}}}*/
-static int reject_name(const char *name) {/*{{{*/
-  if (!strcmp(name, local_to_avoid)) return 1;
-  if (ends_with(name, ".php")) return 1;
-  if (ends_with(name, ".php3")) return 1;
-  if (ends_with(name, ".bak")) return 1;
-  if (ends_with(name, ".swp")) return 1; /* vim swap files */
-  if (ends_with(name, "~")) return 1;
-  if (starts_with(name, "#")) return 1;
-  if (!strcmp(name, ".xvpics")) return 1;
-  return 0;
-}
-/*}}}*/
-static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
+static void scan_one_dir(const char *path, struct namecheck *global_nc, struct fnode *a)/*{{{*/
 {
   /* a is the list onto which the new entries are appended. */
   DIR *d;
   struct dirent *de;
   int pathlen;
+  struct namecheck *local_nc;
 
   pathlen = strlen(path);
 
+  /* This returns null if the file isn't there. */
+  local_nc = make_namecheck("@@UPLOAD@@");
   d = opendir(path);
   if (!d) return; /* tough */
   while ((de = readdir(d))) {
@@ -87,7 +72,7 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
     int namelen, totallen;
     if (!strcmp(de->d_name, ".")) continue;
     if (!strcmp(de->d_name, "..")) continue;
-    if (reject_name(de->d_name)) continue;
+    if (reject_name(de->d_name, global_nc, local_nc)) continue;
 
     /* FIXME : Need some glob handling here to reject file patterns that the
      * user doesn't want to push. */
@@ -121,7 +106,7 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
         nfn->is_dir = 1;
         nfn->x.dir.next = nfn->x.dir.prev = (struct fnode *) &nfn->x.dir;
         add_fnode_at_start(a, nfn);
-        scan_one_dir(full_path, (struct fnode *) &nfn->x.dir.next);
+        scan_one_dir(full_path, global_nc, (struct fnode *) &nfn->x.dir.next);
       } else {
         fprintf(stderr, "Can't handle %s, type not supported\n", full_path);
       }
@@ -129,16 +114,18 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
     free(full_path);
   }
   closedir(d);
+  if (local_nc) free_namecheck(local_nc);
 }
 /*}}}*/
 struct fnode *make_localinv(const char *to_avoid)/*{{{*/
 {
   struct fnode *result;
+  struct namecheck *global_nc;
 
-  local_to_avoid = to_avoid;
+  global_nc = make_namecheck("@@GLOBAL_UPLOAD@@");
   result = new(struct fnode);
   result->next = result->prev = result;
-  scan_one_dir(".", result);
+  scan_one_dir(".", global_nc, result);
   return result;
 };
 /*}}}*/
