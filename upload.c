@@ -322,7 +322,7 @@ static void update_stale_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE
       update_stale_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
     } else {
       /* it's a file */
-      if (a->x.file.is_stale) {
+      if (!a->is_unique && a->x.file.is_stale) {
         update_file(ctrl_con, a, journal);
       } else {
         /* nothing to do. */
