@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g
+CFLAGS=-g -Wall
 DEFINES=-DHAS_STDINT_H=1
 
 OBJ := main.o localinv.o fileinv.o remoteinv.o ftp.o upload.o md5.o

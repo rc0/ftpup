@@ -16,7 +16,10 @@ struct fnode {/*{{{*/
   char *name; /* name within parent directory */
   char *path; /* complete path from top of tree */
   int is_dir;
-  int is_unique; /* 1 if only in this tree, 0 if in peer too. */
+
+  /* Node in other tree that has the same path (if any) */
+  struct fnode *path_peer;
+
   union {
     struct {
       size_t size;
@@ -24,9 +27,12 @@ struct fnode {/*{{{*/
       int md5_defined;
       unsigned char md5[16];
       /* Eventually : perms? md5sum? */
-      struct fnode *peer; /* Peer in other tree, if any */
-      int is_stale;  /* 1 if different between trees, 0 if the same (don't care if
-                        is_unique==1) */
+
+      /* Node in other tree with the same content (to allow rename detection.)
+       * If path_peer is defined, this is set to the same thing if at least the
+       * size and mtime match.  Otherwise, this is set to the file that matches
+       * for size, mtime and md5sum. */
+      struct fnode *content_peer;
     } file;
     struct {
       /* Linked list of entries in the subdirectory. */
@@ -43,6 +49,8 @@ struct remote_params {
   char *remote_root;
 };
 
+struct fnode *make_file_node(const char *tail, const char *path, size_t size, time_t mtime);
+struct fnode *make_dir_node(const char *tail, const char *path);
 void add_fnode_at_start(struct fnode *parent, struct fnode *new_fnode);
 void add_fnode_at_end(struct fnode *parent, struct fnode *new_fnode);
 

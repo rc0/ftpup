@@ -8,7 +8,7 @@
 #include "invent.h"
 #include "memory.h"
 
-static void compute_md5sums(struct fnode *d)
+static void compute_md5sums(struct fnode *d)/*{{{*/
 {
   /* Only applied to the localinv tree */
   struct fnode *a;
@@ -16,7 +16,8 @@ static void compute_md5sums(struct fnode *d)
     if (a->is_dir) {
       compute_md5sums((struct fnode *) &a->x.dir.next);
     } else {
-      if (a->is_unique || a->x.file.is_stale) {
+      /* unique or stale local file */
+      if ((a->path_peer == NULL) || (a->x.file.content_peer == NULL)) {
         MD5_CTX ctx;
         FILE *in;
         unsigned char buf[4096];
@@ -40,24 +41,6 @@ static void compute_md5sums(struct fnode *d)
     }
   }
 }
-
-static void set_subdir_unique(struct fnode *x, int to_what)/*{{{*/
-{
-  /* x is the subdir list of the parent. */
-  struct fnode *e;
-  for (e = x->next; e != x; e = e->next) {
-    e->is_unique = to_what;
-    if (e->is_dir) {
-      set_subdir_unique((struct fnode *) &e->x.dir.next, to_what);
-    }
-  }
-}
-/*}}}*/
-static void set_file_unique(struct fnode *x, int to_what)/*{{{*/
-{
-  x->is_unique = to_what;
-  if (x->is_dir) set_subdir_unique((struct fnode *) &x->x.dir.next, to_what);
-}
 /*}}}*/
 static void inner_reconcile(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
 {
@@ -72,50 +55,43 @@ static void inner_reconcile(struct fnode *fileinv, struct fnode *localinv)/*{{{*
     }
     /* Not matched : e1 is unique (+ everything under it if it's a directory).
     */
-    set_file_unique(e1, 1);
     continue;
 
 matched:
+    e1->path_peer = e2;
+    e2->path_peer = e1;
     if (e1->is_dir) {
       if (e2->is_dir) {
 /*{{{ dir/dir */
-        e1->is_unique = e2->is_unique = 0;
         inner_reconcile((struct fnode *) &e1->x.dir.next,
                         (struct fnode *) &e2->x.dir.next);
 /*}}}*/
       } else {
 /*{{{ dir/file */
-        e2->is_unique = 1;
-        set_file_unique(e1, 1);
 /*}}}*/
       }
     } else {
       if (e2->is_dir) {
 /*{{{ file/dir */
-        e1->is_unique = 1;
-        set_file_unique(e2, 1);
 /*}}}*/
       } else {
         /*{{{ file/file */
         /* Mark uniques == 0, so that the new file is uploaded 'in place'
          * rather than being deleted in the 1st pass and then uploaded anew in
          * the 2nd pass. */
-        e1->is_unique = e2->is_unique = 0;
-        e1->x.file.peer = e2;
-        e2->x.file.peer = e1;
         if (e1->x.file.size == e2->x.file.size) {
           /* Further check based on mtime.  Treat zero mtime as a wildcard
            * (e.g. when the remote index has been built for the first time.)
            * */
+
+          /* FIXME : need to look at md5sums as well here! */
+
           if (!e1->x.file.mtime || !e2->x.file.mtime ||
               (e1->x.file.mtime == e2->x.file.mtime)) {
-            e1->x.file.is_stale = e2->x.file.is_stale = 0;
-          } else {
-            e1->x.file.is_stale = e2->x.file.is_stale = 1;
+            e1->x.file.content_peer = e2;
+            e2->x.file.content_peer = e1;
           }
         } else {
-          /* Certainly differing */
-          e1->x.file.is_stale = e2->x.file.is_stale = 1;
         }
 /*}}}*/
       }
@@ -126,8 +102,6 @@ matched:
 static void reconcile(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
 {
   /* Work out what's in each tree that's not in the other one. */
-  set_subdir_unique(fileinv, 0);
-  set_subdir_unique(localinv, 1);
   inner_reconcile(fileinv, localinv);
   compute_md5sums(localinv);
 }
@@ -137,7 +111,7 @@ static void print_unique(struct fnode *x)/*{{{*/
 {
   struct fnode *e;
   for (e = x->next; e != x; e = e->next) {
-    if (e->is_unique) {
+    if (!e->path_peer) {
       printf("%c %s\n", e->is_dir ? 'D' : 'F',
              e->path);
     }
@@ -151,7 +125,7 @@ static void print_stale(struct fnode *x)/*{{{*/
 {
   struct fnode *e;
   for (e = x->next; e != x; e = e->next) {
-    if (!e->is_unique && !e->is_dir && e->x.file.is_stale) {
+    if ((e->path_peer != NULL) && !e->is_dir && (e->x.file.content_peer == NULL)) {
       printf("F %s\n", e->path);
     }
     if (e->is_dir) {
@@ -214,7 +188,7 @@ static void remove_dead_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE 
     if (a->is_dir) {
       remove_dead_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
     }
-    if (a->is_unique) {
+    if (a->path_peer == NULL) {
       if (a->is_dir) {
         remove_directory(ctrl_con, a, journal);
       } else {
@@ -269,7 +243,7 @@ static void add_new_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *jo
   struct fnode *a;
   for (a = localinv->next; a != localinv; a = a->next) {
     /* Start with shallowest stuff */
-    if (a->is_unique) {
+    if (a->path_peer == NULL) {
       if (a->is_dir) {
         create_directory(ctrl_con, a, journal);
       } else {
@@ -286,7 +260,8 @@ static void add_new_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *jo
 static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)/*{{{*/
 {
   int status;
-  struct fnode *local_peer = file->x.file.peer;
+  /* file points to the entry in the fileinv inventory */
+  struct fnode *local_peer = file->path_peer;
   /* FIXME : magic symlink */
   /* ? do we need to delete the file first for safety (according to STOR in
    * RFC959, no.) */
@@ -316,7 +291,7 @@ static void update_stale_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE
       update_stale_files(ctrl_con, (struct fnode *) &a->x.dir.next, journal);
     } else {
       /* it's a file */
-      if (a->x.file.is_stale) {
+      if ((a->path_peer != NULL) && (a->x.file.content_peer == NULL)) {
         update_file(ctrl_con, a, journal);
       } else {
         /* nothing to do. */
@@ -414,7 +389,7 @@ int upload(const char *password, int is_dummy_run, const char *listing_file, int
     ftp_close(ctrl_con);
   }
 
-  return;
+  return 0;
 }
 /*}}}*/
 

@@ -15,6 +15,34 @@
 /* FIXME : do this properly. */
 static const char *local_to_avoid = NULL;
 
+struct fnode *make_file_node(const char *tail, const char *path, size_t size, time_t mtime)/*{{{*/
+{
+  struct fnode *nfn;
+  nfn = new(struct fnode);
+  nfn->name = new_string(tail);
+  nfn->path = new_string(path);
+  nfn->path_peer = NULL;
+  nfn->is_dir = 0;
+  nfn->x.file.size = size;
+  nfn->x.file.mtime = mtime;
+  nfn->x.file.md5_defined = 0;
+  nfn->x.file.content_peer = NULL;
+  return nfn;
+}
+/*}}}*/
+struct fnode *make_dir_node(const char *tail, const char *path)/*{{{*/
+{
+  struct fnode *nfn;
+  nfn = new(struct fnode);
+  nfn->name = new_string(tail);
+  nfn->path = new_string(path);
+  nfn->path_peer = NULL;
+  nfn->is_dir = 1;
+  nfn->x.dir.next = nfn->x.dir.prev = (struct fnode *) &nfn->x.dir;
+  return nfn;
+}
+/*}}}*/
+
 void add_fnode_at_end(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
 {
   new_fnode->prev = parent->prev;
@@ -105,22 +133,11 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
     if (stat(full_path, &sb) >= 0) {
       if (S_ISREG(sb.st_mode)) {
         struct fnode *nfn;
-        nfn = new(struct fnode);
-        nfn->name = new_string(de->d_name);
-        nfn->path = new_string(full_path);
-        nfn->is_dir = 0;
-        nfn->x.file.size = sb.st_size;
-        nfn->x.file.mtime = sb.st_mtime;
-        nfn->x.file.md5_defined = 0;
-        nfn->x.file.peer = NULL;
+        nfn = make_file_node(de->d_name, full_path, sb.st_size, sb.st_mtime);
         add_fnode_at_end(a, nfn);
       } else if (S_ISDIR(sb.st_mode)) {
         struct fnode *nfn;
-        nfn = new(struct fnode);
-        nfn->name = new_string(de->d_name);
-        nfn->path = new_string(full_path);
-        nfn->is_dir = 1;
-        nfn->x.dir.next = nfn->x.dir.prev = (struct fnode *) &nfn->x.dir;
+        nfn = make_dir_node(de->d_name, full_path);
         add_fnode_at_start(a, nfn);
         scan_one_dir(full_path, (struct fnode *) &nfn->x.dir.next);
       } else {

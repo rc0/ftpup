@@ -121,13 +121,7 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   }
 
   /* otherwise, add new entry */
-  nfn = new(struct fnode);
-  nfn->name = new_string(tail);
-  nfn->path = new_string(p);
-  nfn->is_dir = 0;
-  nfn->x.file.size = size;
-  nfn->x.file.mtime = mtime;
-  nfn->x.file.peer = NULL;
+  nfn = make_file_node(tail,p,size,mtime);
   nfn->x.file.md5_defined = md5_defined;
   if (md5_defined) {
     memcpy(nfn->x.file.md5, md5, 16);
@@ -157,12 +151,7 @@ static void add_directory(struct fnode *a, const char *line)/*{{{*/
   }
 
   /* add */
-  nfn = new(struct fnode);
-  nfn->name = new_string(tail);
-  nfn->path = new_string(p);
-  nfn->is_dir = 1;
-  nfn->x.dir.next = (struct fnode *) &nfn->x.dir;
-  nfn->x.dir.prev = (struct fnode *) &nfn->x.dir;
+  nfn = make_dir_node(tail,p);
   add_fnode_at_start(d, nfn);
 }
 /*}}}*/
@@ -172,7 +161,6 @@ static void delete_entry(struct fnode *a, const char *line)/*{{{*/
   struct fnode *d;
   const char *tail;
   struct fnode *e;
-  struct fnode *nfn;
 
   p = line+1;
   while (isspace(*p)) p++;

@@ -38,24 +38,14 @@ static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x
 
     if (files[i].is_dir) {
       struct fnode *nfn;
-      nfn = new(struct fnode);
-      nfn->name = files[i].name;
-      nfn->path = full_path;
-      nfn->is_dir = 1;
-      nfn->x.dir.next = nfn->x.dir.prev = (struct fnode *) &nfn->x.dir;
+      nfn = make_dir_node(files[i].name, full_path);
       add_fnode_at_start(x, nfn);
       scan_one_dir(ctrl_con, full_path, (struct fnode *) &nfn->x.dir.next);
     } else {
       /* regular file */
       struct fnode *nfn;
-      nfn = new(struct fnode);
-      nfn->name = files[i].name;
-      nfn->path = full_path;
-      nfn->is_dir = 0;
-      nfn->x.file.size = files[i].size;
-      nfn->x.file.mtime = 0;
+      nfn = make_file_node(files[i].name, full_path, files[i].size, 0);
       nfn->x.file.md5_defined = 0;
-      nfn->x.file.peer = NULL;
       add_fnode_at_end(x, nfn);
 
       /* If file is not writable, update the perms */
