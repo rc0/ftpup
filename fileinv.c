@@ -102,10 +102,7 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   nfn->x.file.size = size;
   nfn->x.file.mtime = mtime;
   nfn->x.file.peer = NULL;
-  nfn->next = (struct fnode *) &d->next;
-  nfn->prev = d->prev;
-  d->prev->next = nfn;
-  d->prev = nfn;
+  add_fnode_at_end(d, nfn);
 }
 /*}}}*/
 static void add_directory(struct fnode *a, const char *line)/*{{{*/
@@ -136,10 +133,7 @@ static void add_directory(struct fnode *a, const char *line)/*{{{*/
   nfn->is_dir = 1;
   nfn->x.dir.next = (struct fnode *) &nfn->x.dir;
   nfn->x.dir.prev = (struct fnode *) &nfn->x.dir;
-  nfn->next = (struct fnode *) &d->next;
-  nfn->prev = d->prev;
-  d->prev->next = nfn;
-  d->prev = nfn;
+  add_fnode_at_start(d, nfn);
 }
 /*}}}*/
 static void delete_entry(struct fnode *a, const char *line)/*{{{*/

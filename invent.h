@@ -35,6 +35,9 @@ struct fnode {/*{{{*/
 };
 /*}}}*/
 
+void add_fnode_at_start(struct fnode *parent, struct fnode *new_fnode);
+void add_fnode_at_end(struct fnode *parent, struct fnode *new_fnode);
+
 /* Assume already in the right directory at the point this is called. */
 struct fnode *make_localinv(const char *to_avoid);
 struct fnode *make_fileinv(const char *listing);

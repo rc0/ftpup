@@ -15,12 +15,20 @@
 /* FIXME : do this properly. */
 static const char *local_to_avoid = NULL;
 
-static void add_fnode(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
+void add_fnode_at_end(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
 {
   new_fnode->prev = parent->prev;
   new_fnode->next = parent;
   parent->prev->next = new_fnode;
   parent->prev = new_fnode;
+}
+/*}}}*/
+void add_fnode_at_start(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
+{
+  new_fnode->prev = parent;
+  new_fnode->next = parent->next;
+  parent->next->prev = new_fnode;
+  parent->next = new_fnode;
 }
 /*}}}*/
 
@@ -104,7 +112,7 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
         nfn->x.file.size = sb.st_size;
         nfn->x.file.mtime = sb.st_mtime;
         nfn->x.file.peer = NULL;
-        add_fnode(a, nfn);
+        add_fnode_at_end(a, nfn);
       } else if (S_ISDIR(sb.st_mode)) {
         struct fnode *nfn;
         nfn = new(struct fnode);
@@ -112,7 +120,7 @@ static void scan_one_dir(const char *path, struct fnode *a)/*{{{*/
         nfn->path = new_string(full_path);
         nfn->is_dir = 1;
         nfn->x.dir.next = nfn->x.dir.prev = (struct fnode *) &nfn->x.dir;
-        add_fnode(a, nfn);
+        add_fnode_at_start(a, nfn);
         scan_one_dir(full_path, (struct fnode *) &nfn->x.dir.next);
       } else {
         fprintf(stderr, "Can't handle %s, type not supported\n", full_path);

@@ -9,15 +9,6 @@
 #include "invent.h"
 #include "memory.h"
 
-static void add_fnode(struct fnode *parent, struct fnode *new_fnode)/*{{{*/
-{
-  new_fnode->prev = parent->prev;
-  new_fnode->next = parent;
-  parent->prev->next = new_fnode;
-  parent->prev = new_fnode;
-}
-/*}}}*/
-
 static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x)/*{{{*/
 {
   struct FTP_stat *files;
@@ -50,7 +41,7 @@ static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x
       nfn->path = full_path;
       nfn->is_dir = 1;
       nfn->x.dir.next = nfn->x.dir.prev = (struct fnode *) &nfn->x.dir;
-      add_fnode(x, nfn);
+      add_fnode_at_start(x, nfn);
       scan_one_dir(ctrl_con, full_path, (struct fnode *) &nfn->x.dir.next);
     } else {
       /* regular file */
@@ -62,8 +53,7 @@ static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x
       nfn->x.file.size = files[i].size;
       nfn->x.file.mtime = 0;
       nfn->x.file.peer = NULL;
-      /* TODO : something about perms */
-      add_fnode(x, nfn);
+      add_fnode_at_end(x, nfn);
     }
   }
   free(files);

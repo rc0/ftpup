@@ -1,6 +1,4 @@
-- When building inventory, put subdirectories before files, so that upload is
-  done depth first.  (This will help with getting .listing files updated after
-  the files they list.)
+- when building remote inventory, detect lack of write perm and fix.
 
 - remember hostname, username and remote root details in listing file.  Should
   only have to enter them when doing the -R option the first time.
