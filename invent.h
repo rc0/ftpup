@@ -43,11 +43,17 @@ struct fnode {/*{{{*/
 };
 /*}}}*/
 
-struct remote_params {
+static inline struct fnode *dir_children(struct fnode *x) {/*{{{*/
+  return (struct fnode *) &x->x.dir.next;
+}
+/*}}}*/
+
+struct remote_params {/*{{{*/
   char *hostname;
   char *username;
   char *remote_root;
 };
+/*}}}*/
 
 struct fnode *make_file_node(const char *tail, const char *path, size_t size, time_t mtime);
 struct fnode *make_dir_node(const char *tail, const char *path);

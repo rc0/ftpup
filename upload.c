@@ -8,6 +8,29 @@
 #include "invent.h"
 #include "memory.h"
 
+static void compute_file_md5sum(struct fnode *f)/*{{{*/
+{
+  MD5_CTX ctx;
+  FILE *in;
+  unsigned char buf[4096];
+  int n;
+  MD5Init(&ctx);
+  in = fopen(f->path, "rb");
+  if (!in) {
+    fprintf(stderr, "Cannot open %s for reading\n", f->path);
+    exit(1);
+  }
+  while (1) {
+    n = fread(buf, 1, 4096, in);
+    if (!n) break;
+    MD5Update(&ctx, buf, n);
+  }
+  fclose(in);
+  MD5Final(&ctx);
+  memcpy(f->x.file.md5, ctx.digest, 16);
+  f->x.file.md5_defined = 1;
+}
+/*}}}*/
 static void compute_md5sums(struct fnode *d)/*{{{*/
 {
   /* Only applied to the localinv tree */
@@ -18,25 +41,7 @@ static void compute_md5sums(struct fnode *d)/*{{{*/
     } else {
       /* unique or stale local file */
       if ((a->path_peer == NULL) || (a->x.file.content_peer == NULL)) {
-        MD5_CTX ctx;
-        FILE *in;
-        unsigned char buf[4096];
-        int n;
-        MD5Init(&ctx);
-        in = fopen(a->path, "rb");
-        if (!in) {
-          fprintf(stderr, "Cannot open %s for reading\n", a->path);
-          exit(1);
-        }
-        while (1) {
-          n = fread(buf, 1, 4096, in);
-          if (!n) break;
-          MD5Update(&ctx, buf, n);
-        }
-        fclose(in);
-        MD5Final(&ctx);
-        memcpy(a->x.file.md5, ctx.digest, 16);
-        a->x.file.md5_defined = 1;
+        compute_file_md5sum(a);
       }
     }
   }
@@ -99,11 +104,158 @@ matched:
   }
 }
 /*}}}*/
+
+static int count_unmatched(struct fnode *x)/*{{{*/
+{
+  /* Return number of remote files that don't already match (i.e. against their
+   * path peer at this stage) and which have known md5 values. */
+  int count = 0;
+  struct fnode *a;
+  for (a = x->next; a != x; a = a->next) {
+    if (a->is_dir) {
+      count += count_unmatched(dir_children(a));
+    } else {
+      if (!a->x.file.content_peer && a->x.file.md5_defined) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+/*}}}*/
+static void populate_unmatched(struct fnode *x, struct fnode **array, int *index)/*{{{*/
+{
+  struct fnode *a;
+  for (a = x->next; a != x; a = a->next) {
+    if (a->is_dir) {
+      populate_unmatched(dir_children(a), array, index);
+    } else {
+      if (!a->x.file.content_peer && a->x.file.md5_defined) {
+        array[*index] = a;
+        ++*index;
+      }
+    }
+  }
+}
+/*}}}*/
+static void find_unmatched_files(struct fnode *fileinv, struct fnode ***entries, int *n_entries)/*{{{*/
+{
+  int N, i, index;
+  struct fnode **ent;
+  *n_entries = N = count_unmatched(fileinv);
+  *entries = ent = new_array(struct fnode *, N);
+  index = 0;
+  populate_unmatched(fileinv, ent, &index);
+
+  /* Test */
+  printf("Unmatched entries for potential rename :\n");
+  for (i=0; i<N; i++) {
+    printf("%s\n", ent[i]->path);
+  }
+}
+/*}}}*/
+
+#define TMAP(T, a, aa) const T *aa = (const T *) (a)
+
+static int compare_unmatched(const void *a, const void *b)/*{{{*/
+{
+  TMAP(struct fnode *, a, aa);
+  TMAP(struct fnode *, b, bb);
+  return strcmp((*aa)->x.file.md5, (*bb)->x.file.md5);
+}
+/*}}}*/
+
+static void match_on_md5(struct fnode *a, struct fnode **table, int *n_table)/*{{{*/
+{
+  int l, h, m;
+  int c;
+  int hit = 0;
+  int i;
+
+  l = 0;
+  h = *n_table;
+  while (l < h) {
+    m = (l + h) >> 1;
+    c = strcmp(a->x.file.md5, table[m]->x.file.md5);
+    if (c == 0) {
+      hit = 1;
+      break;
+    }
+    if (m == l) break;
+
+    if (c < 0) h = m;
+    else       l = m;
+
+  }
+
+  if (hit) {
+    printf("Found a rename :\nlocal: %s\n  to\nremote: %s\n",
+           a->path, table[m]->path);
+    a->x.file.content_peer = table[m];
+    table[m]->x.file.content_peer = a;
+    /* Squeeze the matched entry out of the remote unmatched array.  This
+     * prevents us getting multiple matches on the same remote file when
+     * several local files somehow have identical parameters. */
+    for (i = m+1; i < *n_table; i++) {
+      table[i-1] = table[i];
+    }
+    --*n_table;
+  } else {
+    char *md5buf = format_md5(a);
+    printf("No rename match for %s (%s)\n", a->path, md5buf);
+  }
+}
+/*}}}*/
+static void matchup_files(struct fnode *lx, struct fnode **table, int *n_table)/*{{{*/
+{
+  struct fnode *a;
+  for (a = lx->next; a != lx; a = a->next) {
+    if (a->is_dir) {
+      matchup_files(dir_children(a), table, n_table);
+    } else {
+      if (!a->x.file.content_peer) {
+        /* Candidate for rename */
+        if (!a->x.file.md5_defined) {
+          compute_file_md5sum(a);
+        }
+        match_on_md5(a, table, n_table);
+      }
+    }
+  }
+}
+/*}}}*/
+static void find_content_matches(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
+{
+  struct fnode **remote_unmatched;
+  int n_remote_unmatched;
+  int i;
+
+  find_unmatched_files(fileinv, &remote_unmatched, &n_remote_unmatched);
+  qsort(remote_unmatched, n_remote_unmatched, sizeof(struct fnode *), compare_unmatched);
+  printf("After sorting\n");
+  fflush(stdout);
+  for (i=0; i<n_remote_unmatched; i++) {
+    char *md5buf;
+    md5buf = format_md5(remote_unmatched[i]);
+    printf("%s %s\n", md5buf, remote_unmatched[i]->path);
+  }
+  printf("\n");
+  matchup_files(localinv, remote_unmatched, &n_remote_unmatched);
+
+  free(remote_unmatched);
+}
+/*}}}*/
+
 static void reconcile(struct fnode *fileinv, struct fnode *localinv)/*{{{*/
 {
   /* Work out what's in each tree that's not in the other one. */
   inner_reconcile(fileinv, localinv);
+  find_content_matches(fileinv, localinv);
+  
+#if 0
+  /* Don't compute this for everything here. */
   compute_md5sums(localinv);
+#endif
 }
 /*}}}*/
 

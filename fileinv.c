@@ -116,6 +116,10 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
       /* Update parameters */
       e->x.file.size = size;
       e->x.file.mtime = mtime;
+      e->x.file.md5_defined = md5_defined;
+      if (md5_defined) {
+        memcpy(e->x.file.md5, md5, 16);
+      }
       return;
     }
   }
