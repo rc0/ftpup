@@ -1,13 +1,12 @@
-- when building remote inventory, detect lack of write perm and fix. (? do we need this?)
-
 - comfort messages need to include how many files are done v how many to go and
-  an idea of total amount of date done and to go also.
+  an idea of total amount of date done and to go also. (user expected to know
+  this through running -N first?)
 
 - for update, write new file to a temporary name and use renaming after the
   upload - avoid situation where a half-present file is on the remote site for
   an extended period.  (use STOU)
 
-- valgrind the program
+- implement lint mode
 
 - rename + retag to usable name for release
 
@@ -20,6 +19,7 @@
 - per-directory and per-subtree ignore lists
 
 - test against more ftp servers
+
 
 # arch-tag: c7d95446-c4b1-48a8-920c-dc8ec90229c6
 
