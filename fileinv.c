@@ -17,6 +17,11 @@
    D - directory
    Z - deleted
 
+   or the 3 special entries that only occur once:
+   H <hostname>
+   U <username>
+   R <remote_root>
+
    The last match for given filename wins.  This allows appending to the end of
    the file as remote files are updated, giving an auto-journalling capability.
 
@@ -182,7 +187,12 @@ do_delete:
 }
 /*}}}*/
 
-struct fnode *make_fileinv(const char *listing)/*{{{*/
+static char *copy_data(const char *in)/*{{{*/
+{
+  return new_string(in + 2);
+}
+/*}}}*/
+struct fnode *make_fileinv(const char *listing, struct remote_params *rp)/*{{{*/
 {
   /* listing is the path to the file containing the cache of what's on the
    * remote site. */
@@ -209,6 +219,15 @@ struct fnode *make_fileinv(const char *listing)/*{{{*/
       *p = '\0';
     }
     switch (line[0]) {
+      case 'H':
+        rp->hostname = copy_data(line);
+        break;
+      case 'U':
+        rp->username = copy_data(line);
+        break;
+      case 'R':
+        rp->remote_root = copy_data(line);
+        break;
       case 'F':
         add_file(result, line);
         break;

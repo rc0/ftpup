@@ -5,14 +5,21 @@
 - comfort messages need to include how many files are done v how many to go and
   an idea of total amount of date done and to go also.
 
-- remember hostname, username and remote root details in listing file.  Should
-  only have to enter them when doing the -R option the first time.
-
 - write out clean journal before starting upload process
+or
+- implement preen mode to cut listing file down to just the latest entry for each file/dir
+
+- for update, write new file to a temporary name and use renaming after the
+  upload - avoid situation where a half-present file is on the remote site for
+  an extended period.  (use STOU)
 
 - show %done for file upload to give more comfort for slow servers + start/finish messages
 
-- md5 stuff, rename detection + upload
+- valgrind the program
+
+- rename + retag to usable name for release
+
+- md5 stuff, rename detection + upload (chains + rings of renames etc)
 
 - test against more ftp servers
 

@@ -35,15 +35,25 @@ struct fnode {/*{{{*/
 };
 /*}}}*/
 
+struct remote_params {
+  char *hostname;
+  char *username;
+  char *remote_root;
+};
+
 void add_fnode_at_start(struct fnode *parent, struct fnode *new_fnode);
 void add_fnode_at_end(struct fnode *parent, struct fnode *new_fnode);
 
 /* Assume already in the right directory at the point this is called. */
 struct fnode *make_localinv(const char *to_avoid);
-struct fnode *make_fileinv(const char *listing);
+struct fnode *make_fileinv(const char *listing, struct remote_params *);
 struct fnode *make_remoteinv(const char *hostname, const char *username, const char *password, const char *remote_root);
 
-void print_inventory(struct fnode *a, const char *to_file);
+void print_inventory(struct fnode *a, const char *to_file, const char *hostname, const char *username, const char *remote_root);
+
+void init_remote_params(struct remote_params *rp);  
+int upload(const char *password, int is_dummy_run, const char *listing_file);
+
 #endif /* INVENT_H */
 
 /* arch-tag: c12bf55b-97e2-4ffe-9092-2345b28d57c9

@@ -85,13 +85,21 @@ int main (int argc, char **argv) {
   }
   
   if (do_remote_inv) {
+    if (!hostname) {
+      fprintf(stderr, "-R requires hostname\n");
+      exit(1);
+    }
+    if (!username) {
+      fprintf(stderr, "-R requires username\n");
+      exit(1);
+    }
     reminv = make_remoteinv(hostname, username, password, remote_root);
-    print_inventory(reminv, listing_file);
+    print_inventory(reminv, listing_file, hostname, username, remote_root);
   } else if (do_lint) {
   } else if (do_upload) {
-    upload(hostname, username, password, remote_root, 0, listing_file);
+    upload(password, 0, listing_file);
   } else if (do_dummy_upload) {
-    upload(hostname, username, password, remote_root, 1, listing_file);
+    upload(password, 1, listing_file);
   }
 
   return 0;

@@ -308,13 +308,24 @@ static void upload_for_real(struct FTP *ctrl_con, struct fnode *localinv, struct
 }
 /*}}}*/
 
+void init_remote_params(struct remote_params *rp)/*{{{*/
+{
+  rp->hostname    = NULL;
+  rp->username    = NULL;
+  rp->remote_root = NULL;
+}
+/*}}}*/
+
 /* Assume already in correct local directory. */
-int upload(const char *hostname, const char *username, const char *password, const char *remote_root, int is_dummy_run, const char *listing_file)/*{{{*/
+int upload(const char *password, int is_dummy_run, const char *listing_file)/*{{{*/
 {
   struct fnode *localinv;
   struct fnode *fileinv;
+  struct remote_params rp;
 
-  fileinv = make_fileinv(listing_file);
+  init_remote_params(&rp);
+
+  fileinv = make_fileinv(listing_file, &rp);
   localinv = make_localinv(listing_file);
   
   reconcile(fileinv, localinv);
@@ -323,9 +334,9 @@ int upload(const char *hostname, const char *username, const char *password, con
     upload_dummy(localinv, fileinv);
   } else {
     struct FTP *ctrl_con;
-    ctrl_con = ftp_open(hostname, username, password);
-    if (remote_root) {
-      ftp_cwd(ctrl_con, remote_root);
+    ctrl_con = ftp_open(rp.hostname, rp.username, password);
+    if (rp.remote_root) {
+      ftp_cwd(ctrl_con, rp.remote_root);
     }
     upload_for_real(ctrl_con, localinv, fileinv, listing_file);
     ftp_close(ctrl_con);

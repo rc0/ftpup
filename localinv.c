@@ -158,13 +158,19 @@ static void inner_print_inventory(struct fnode *a, FILE *out)/*{{{*/
 }
 /*}}}*/
 
-void print_inventory(struct fnode *a, const char *to_file)/*{{{*/
+void print_inventory(struct fnode *a, const char *to_file, const char *hostname, const char *username, const char *remote_root)/*{{{*/
 {
   FILE *out;
   if (to_file) {
     out = fopen(to_file, "w");
   } else {
     out = NULL;
+  }
+
+  fprintf(out, "H %s\n", hostname);
+  fprintf(out, "U %s\n", username);
+  if (remote_root) {
+    fprintf(out, "R %s\n", remote_root);
   }
 
   inner_print_inventory(a, out);
