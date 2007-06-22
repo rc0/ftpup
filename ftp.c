@@ -25,47 +25,57 @@ struct FTP {/*{{{*/
   char *bufptr;
 };
 /*}}}*/
+static char *find_line_end(char *c0, char *c1)
+{
+  char *p;
+  p = c0;
+  while (p < c1-1) {
+    if (p[0]=='\r' && p[1] == '\n') {
+      return p;
+    } else {
+      p++;
+    }
+  }
+  return NULL;
+}
 static char *read_line(struct FTP *con)/*{{{*/
 {
   char *result;
   int n;
   char *p;
   
-  while (1) {
-    n = read(con->fd, con->bufptr, con->readbuf + sizeof(con->readbuf) - con->bufptr);
-    if (n < 0) {
-      perror("read");
-      exit(1);
-    }
-    if (n == 0) {
-      return NULL;
-    }
-    con->bufptr += n;
-    p = con->readbuf;
-    while (p < con->bufptr - 1) {
-      if (p[0]=='\r' && p[1] == '\n') {
-        /* match */
-        int len = p - con->readbuf;
-        int remain;
-        result = new_array(char, len+1);
-        memcpy(result, con->readbuf, len);
-        result[len] = 0;
-        if (verbose) {
-          printf("Got line [%s]\n", result);
-        }
-        remain = con->bufptr - (p+2);
-        if (remain > 0) {
-          memmove(con->readbuf, p+2, remain);
-          con->bufptr -= (len + 2);
-        } else {
-          con->bufptr = con->readbuf;
-        }
-        return result;
-      } else {
-        p++;
+  do {
+    p = find_line_end(con->readbuf, con->bufptr);
+    if (p) {
+      int len = p - con->readbuf;
+      int remain;
+      result = new_array(char, len+1);
+      memcpy(result, con->readbuf, len);
+      result[len] = 0;
+      if (verbose) {
+        printf("Got line [%s]\n", result);
+        fflush(stdout);
       }
+      remain = con->bufptr - (p+2);
+      if (remain > 0) {
+        memmove(con->readbuf, p+2, remain);
+        con->bufptr -= (len + 2);
+      } else {
+        con->bufptr = con->readbuf;
+      }
+      return result;
+    } else {
+      n = read(con->fd, con->bufptr, con->readbuf + sizeof(con->readbuf) - con->bufptr);
+      if (n < 0) {
+        perror("read");
+        exit(1);
+      }
+      if (n == 0) {
+        return NULL;
+      }
+      con->bufptr += n;
     }
-  }
+  } while (1);
 }
 /*}}}*/
 static int get_status(const char *x)/*{{{*/
