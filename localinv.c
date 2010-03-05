@@ -97,7 +97,27 @@ static void scan_one_dir(const char *path, struct namecheck *global_nc, struct f
         nfn->x.file.size = sb.st_size;
         nfn->x.file.mtime = sb.st_mtime;
         nfn->x.file.peer = NULL;
+        nfn->x.file.link_target = NULL;
         add_fnode_at_end(a, nfn);
+      } else if (S_ISLNK(sb.st_mode)) {
+        struct fnode *nfn;
+        char target_buf[4096];
+        size_t target_bufsiz = sizeof(target_buf);
+        int status;
+        nfn = new(struct fnode);
+        nfn->name = new_string(de->d_name);
+        nfn->path = new_string(full_path);
+        nfn->is_dir = 0;
+        nfn->x.file.size = sb.st_size;
+        nfn->x.file.mtime = sb.st_mtime;
+        nfn->x.file.peer = NULL;
+        status = readlink(full_path, target_buf, target_bufsiz);
+        if (status < 0) {
+          perror("Could not readlink");
+        } else {
+          nfn->x.file.link_target = new_string(target_buf);
+          add_fnode_at_end(a, nfn);
+        }
       } else if (S_ISDIR(sb.st_mode)) {
         struct fnode *nfn;
         nfn = new(struct fnode);
@@ -138,6 +158,11 @@ static void inner_print_inventory(struct fnode *a, FILE *out)/*{{{*/
     if (b->is_dir) {
       fprintf(out ? out : stdout, "D                   %s\n", b->path);
       inner_print_inventory((struct fnode *) &b->x.dir.next, out);
+    } else if (b->x.file.link_target) {
+#if 0
+      fprintf(out ? out : stdout, "L %s %s\n", b->path, b->x.file.link_target);
+#endif
+      fprintf(out ? out : stdout, "L %8d %08x %s %s\n", 0, 0, b->path, b->x.file.link_target);
     } else {
       fprintf(out ? out : stdout, "F %8d %08lx %s\n", b->x.file.size, b->x.file.mtime, b->path);
     }

@@ -359,6 +359,7 @@ struct file_list {/*{{{*/
   int size;
   int perms;
   int is_dir;
+  char *link_target;
 };
 /*}}}*/
 static void strip_termination(char *line)/*{{{*/
@@ -389,9 +390,10 @@ static void split_into_fields(char *line, char **fields, int *n_fields)/*{{{*/
   }
 }
 /*}}}*/
-static void parse_perms(const char *field, int *perms, int *is_dir)/*{{{*/
+static void parse_perms(const char *field, int *perms, int *is_dir, int *is_link)/*{{{*/
 {
-  *is_dir =  (field[0] == 'd') ? 1 : 0;
+  *is_dir  =  (field[0] == 'd') ? 1 : 0;
+  *is_link =  (field[0] == 'l') ? 1 : 0;
   *perms  = ((field[1] == 'r') ? (1<<8) : 0) |
             ((field[2] == 'w') ? (1<<7) : 0) |
             ((field[3] == 'x') ? (1<<6) : 0) |
@@ -403,7 +405,7 @@ static void parse_perms(const char *field, int *perms, int *is_dir)/*{{{*/
             ((field[9] == 'x') ? (1<<0) : 0);
 }
 /*}}}*/
-static void append_file(struct file_list *fl, const char *name, int size, int perms, int is_dir)/*{{{*/
+static void append_file(struct file_list *fl, const char *name, int size, int perms, int is_dir, const char *link_target)/*{{{*/
 {
   struct file_list *new_fl;
 
@@ -412,7 +414,8 @@ static void append_file(struct file_list *fl, const char *name, int size, int pe
   new_fl->size = size;
   new_fl->perms = perms;
   new_fl->is_dir = is_dir;
-  
+  new_fl->link_target = link_target ? new_string(link_target) : NULL;
+
   new_fl->next = fl;
   new_fl->prev = fl->prev;
   fl->prev->next = new_fl;
@@ -527,9 +530,12 @@ int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
   in = fdopen(data_fd, "rb");
   while (fgets(line, sizeof(line), in)) {
     int size;
-    int perms, is_dir;
-    char *name;
+    int perms, is_dir, is_link;
+    char *name, *link_target;
     strip_termination(line);
+    if (verbose) {
+      printf("  read [%s]\n", line);
+    }
     /* Some servers (e.g. SuperH's one) report a total line at the start of the
      * listing. */
     if (!strncmp(line, "total", 5)) continue;
@@ -538,14 +544,20 @@ int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
       fprintf(stderr, "Didn't see expected number of fields\n");
       exit(1);
     }
-    name = fields[n_fields - 1];
+    parse_perms(fields[0], &perms, &is_dir, &is_link);
+    if (is_link) {
+      name = fields[n_fields - 3];
+      link_target = fields[n_fields - 1];
+    } else {
+      name = fields[n_fields - 1];
+      link_target = NULL;
+    }
     size = atoi(fields[n_fields - 5]);
-    parse_perms(fields[0], &perms, &is_dir);
     if (strcmp(name, ".") && strcmp(name, "..")) {
       /* Don't add . or .. entries to the list else it will recurse infinitely.
        * */
       ++N;
-      append_file(&fl, name, size, perms, is_dir);
+      append_file(&fl, name, size, perms, is_dir, link_target);
     }
   }
 
@@ -564,6 +576,7 @@ int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
     (*file_data)[i].size = a->size;
     (*file_data)[i].perms = a->perms;
     (*file_data)[i].name = a->name;
+    (*file_data)[i].link_target = a->link_target;
     next_a = a->next;
     free(a);
   }

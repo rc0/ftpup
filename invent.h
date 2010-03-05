@@ -25,6 +25,7 @@ struct fnode {/*{{{*/
       struct fnode *peer; /* Peer in other tree, if any */
       int is_stale;  /* 1 if different between trees, 0 if the same (don't care if
                         is_unique==1) */
+      char *link_target; /* If non-null, name is a symlink and this is its target */
     } file;
     struct {
       /* Linked list of entries in the subdirectory. */

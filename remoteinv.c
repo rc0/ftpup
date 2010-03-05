@@ -55,6 +55,7 @@ static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x
       nfn->x.file.size = files[i].size;
       nfn->x.file.mtime = 0;
       nfn->x.file.peer = NULL;
+      nfn->x.file.link_target = files[i].link_target;
       add_fnode_at_end(x, nfn);
 
       /* If file is not writable, update the perms */

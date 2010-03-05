@@ -9,6 +9,7 @@ struct FTP_stat {
   int perms;
   size_t size;
   char *name;
+  char *link_target;
 };
 
 extern struct FTP *ftp_open(const char *host,

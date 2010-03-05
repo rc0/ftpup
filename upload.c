@@ -52,40 +52,60 @@ matched:
                         (struct fnode *) &e2->x.dir.next);
 /*}}}*/
       } else {
-/*{{{ dir/file */
+/*{{{ dir/file or dir/symlink */
         e2->is_unique = 1;
         set_file_unique(e1, 1);
 /*}}}*/
       }
     } else {
       if (e2->is_dir) {
-/*{{{ file/dir */
+/*{{{ file/dir or symlink/dir */
         e1->is_unique = 1;
         set_file_unique(e2, 1);
 /*}}}*/
       } else {
-        /*{{{ file/file */
-        /* Mark uniques == 0, so that the new file is uploaded 'in place'
-         * rather than being deleted in the 1st pass and then uploaded anew in
-         * the 2nd pass. */
-        e1->is_unique = e2->is_unique = 0;
-        e1->x.file.peer = e2;
-        e2->x.file.peer = e1;
-        if (e1->x.file.size == e2->x.file.size) {
-          /* Further check based on mtime.  Treat zero mtime as a wildcard
-           * (e.g. when the remote index has been built for the first time.)
-           * */
-          if (!e1->x.file.mtime || !e2->x.file.mtime ||
-              (e1->x.file.mtime == e2->x.file.mtime)) {
-            e1->x.file.is_stale = e2->x.file.is_stale = 0;
+        if (e1->x.file.link_target) {
+          if (e2->x.file.link_target) {
+            /* symlink/symlink */
+            if (!strcmp(e1->x.file.link_target, e2->x.file.link_target)) {
+              e1->is_unique = e2->is_unique = 0;
+              e1->x.file.is_stale = e2->x.file.is_stale = 0;
+            } else {
+              /* Force delete + upload */
+              e1->is_unique = e2->is_unique = 1;
+            }
           } else {
-            e1->x.file.is_stale = e2->x.file.is_stale = 1;
+            /* symlink/file */
+            e1->is_unique = e2->is_unique = 1;
           }
         } else {
-          /* Certainly differing */
-          e1->x.file.is_stale = e2->x.file.is_stale = 1;
+          /* e1 is regular */
+          if (e2->x.file.link_target) {
+            /* file/symlink */
+            e1->is_unique = e2->is_unique = 1;
+          } else {
+            /* Mark uniques == 0, so that the new file is uploaded 'in place'
+             * rather than being deleted in the 1st pass and then uploaded anew in
+             * the 2nd pass. */
+            e1->is_unique = e2->is_unique = 0;
+            e1->x.file.peer = e2;
+            e2->x.file.peer = e1;
+            if (e1->x.file.size == e2->x.file.size) {
+              /* Further check based on mtime.  Treat zero mtime as a wildcard
+               * (e.g. when the remote index has been built for the first time.)
+               * */
+              if (!e1->x.file.mtime || !e2->x.file.mtime ||
+                  (e1->x.file.mtime == e2->x.file.mtime)) {
+                e1->x.file.is_stale = e2->x.file.is_stale = 0;
+              } else {
+                e1->x.file.is_stale = e2->x.file.is_stale = 1;
+              }
+            } else {
+              /* Certainly differing */
+              e1->x.file.is_stale = e2->x.file.is_stale = 1;
+            }
+          }
         }
-/*}}}*/
       }
     }
   }
@@ -194,6 +214,8 @@ static void remove_dead_files(struct FTP *ctrl_con, struct fnode *fileinv, FILE 
     if (a->is_unique) {
       if (a->is_dir) {
         remove_directory(ctrl_con, a, journal);
+      } else if (a->x.file.link_target) {
+        remove_symlink(ctrl_con, a, journal);
       } else {
         remove_file(ctrl_con, a, journal);
       }
@@ -283,6 +305,8 @@ static void add_new_files(struct FTP *ctrl_con, struct fnode *localinv, FILE *jo
     if (a->is_unique) {
       if (a->is_dir) {
         create_directory(ctrl_con, a, journal);
+      } else if (a->x.file.link_target) {
+        create_symlink(ctrl_con, a, journal);
       } else {
         create_file(ctrl_con, a, journal);
       }

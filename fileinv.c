@@ -13,6 +13,7 @@
 /* Notes on listing file format.
  
    1st column indicates file type:
+   L - symbolic link
    F - ordinary file
    D - directory
    Z - deleted
@@ -28,6 +29,10 @@
    For 'F' lines, the syntax is
 
    F <size> <mtime> <name>
+
+   For 'L' lines, the syntax is
+
+   L <name> <target>
 
    <name> is relative to the top directory, i.e. no / at the start.
    <size> in bytes
@@ -99,6 +104,8 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
       /* Update parameters */
       e->x.file.size = size;
       e->x.file.mtime = mtime;
+      if (e->x.file.link_target) free(e->x.file.link_target);
+      e->x.file.link_target = NULL;
       return;
     }
   }
@@ -110,6 +117,53 @@ static void add_file(struct fnode *a, const char *line)/*{{{*/
   nfn->is_dir = 0;
   nfn->x.file.size = size;
   nfn->x.file.mtime = mtime;
+  nfn->x.file.link_target = NULL;
+  nfn->x.file.peer = NULL;
+  add_fnode_at_end(d, nfn);
+}
+/*}}}*/
+static void add_symlink(struct fnode *a, const char *line)/*{{{*/
+{
+  const char *p;
+  struct fnode *d;
+  const char *tail;
+  struct fnode *e;
+  struct fnode *nfn;
+  char namebuf[4096], *np;
+  const char *target;
+
+  p = line+1;
+  while (isspace(*p)) p++;
+  np = namebuf;
+  while (!isspace(*p)) {
+    *np++ = *p++;
+  }
+  *np = 0;
+  while (isspace(*p)) p++;
+  target = p;
+  /* p now pointing to path */
+  lookup_dir(a, namebuf, namebuf, &d, &tail);
+
+  /* lookup */
+  for (e = d->next; e != d; e = e->next) {
+    if (!strcmp(e->name, tail)) {
+      /* Update parameters */
+      if (e->x.file.link_target) free(e->x.file.link_target);
+      e->x.file.link_target = new_string(target);
+      e->x.file.size = 0;
+      e->x.file.mtime = 0;
+      return;
+    }
+  }
+
+  /* otherwise, add new entry */
+  nfn = new(struct fnode);
+  nfn->name = new_string(tail);
+  nfn->path = new_string(p);
+  nfn->is_dir = 0;
+  nfn->x.file.size = 0;
+  nfn->x.file.mtime = 0;
+  nfn->x.file.link_target = new_string(target);
   nfn->x.file.peer = NULL;
   add_fnode_at_end(d, nfn);
 }
@@ -235,6 +289,9 @@ struct fnode *make_fileinv(const char *listing, struct remote_params *rp)/*{{{*/
       case 'F':
         add_file(result, line);
         break;
+      case 'L':
+        add_symlink(result, line);
+        break;
       case 'D':
         add_directory(result, line);
         break;
@@ -247,7 +304,7 @@ struct fnode *make_fileinv(const char *listing, struct remote_params *rp)/*{{{*/
     }
     number++;
   }
-        
+
   fclose(in);
   return result;
 }
