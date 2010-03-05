@@ -259,15 +259,15 @@ static void create_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
   struct callback_info info;
   
   /* FIXME : magic symlink */
-  printf("Creating remote file %s (%d bytes) ( 0%%)", short_name, file->x.file.size);
+  printf("Creating remote file %s (%d bytes) ( 0%%)", short_name, (int)file->x.file.size);
   fflush(stdout);
   info.last_time = time(NULL);
   status = ftp_write(ctrl_con, file->path, file->path, write_callback, &info);
   /* FIXME : md5sum */
   if (status) {
-    fprintf(journal, "F %8d %08lx %s\n", file->x.file.size, file->x.file.mtime, file->path);
+    fprintf(journal, "F %8d %08lx %s\n", (int)file->x.file.size, file->x.file.mtime, file->path);
     fflush(journal);
-    printf("\rDone creating new remote file %s (%d bytes)\n", file->path, file->x.file.size);
+    printf("\rDone creating new remote file %s (%d bytes)\n", file->path, (int)file->x.file.size);
     fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO CREATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);
@@ -306,15 +306,15 @@ static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
    * RFC959, no.) */
   short_name = truncate_name(file->path);
 
-  printf("Updating %s (%d bytes) ( 0%%)", short_name, local_peer->x.file.size);
+  printf("Updating %s (%d bytes) ( 0%%)", short_name, (int)local_peer->x.file.size);
   fflush(stdout);
   info.last_time = time(NULL);
   status = ftp_write(ctrl_con, file->path, file->path, write_callback, &info);
   /* FIXME : md5sum */
   if (status) {
-    fprintf(journal, "F %8d %08lx %s\n", local_peer->x.file.size, local_peer->x.file.mtime, file->path);
+    fprintf(journal, "F %8d %08lx %s\n", (int)local_peer->x.file.size, local_peer->x.file.mtime, file->path);
     fflush(journal);
-    printf("\rDone updating remote file %s (%d bytes)\n", file->path, local_peer->x.file.size);
+    printf("\rDone updating remote file %s (%d bytes)\n", file->path, (int)local_peer->x.file.size);
     fflush(stdout);
   } else {
     fprintf(stderr, "FAILED TO UPDATE FILE %s ON REMOTE SIZE, ABORTING\n", file->path);

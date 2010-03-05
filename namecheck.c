@@ -25,14 +25,14 @@ struct namecheck {/*{{{*/
 /*}}}*/
 static void map_line(char *line, struct namecheck *nc)/*{{{*/
 {
-  unsigned char *p, *q;
+  char *p, *q;
   int len;
   int negate = 0;
   int wild_at_start = 0;
   int wild_at_end = 0;
   struct pattern *np;
   
-  p = (unsigned char *) line;
+  p = line;
   len = strlen(line);
   if (line[len-1] == '\n') line[len-1] = 0;
   

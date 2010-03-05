@@ -251,7 +251,7 @@ int open_passive_data_con(struct FTP *ctrl_con)/*{{{*/
 static void setup_active_data_con(struct FTP *ctrl_con)/*{{{*/
 {
   struct sockaddr_in ctrl_sock_addr, data_sock_addr;
-  int ctrl_sock_addr_len, data_sock_addr_len;
+  unsigned int ctrl_sock_addr_len, data_sock_addr_len;
   int status;
   unsigned long ip_addr;
   unsigned short port;
@@ -322,7 +322,7 @@ static void setup_active_data_con(struct FTP *ctrl_con)/*{{{*/
 static int open_active_data_con(struct FTP *ctrl_con)/*{{{*/
 {
   struct sockaddr_in peer_sock_addr;
-  int peer_sock_addr_len;
+  unsigned int peer_sock_addr_len;
   unsigned long ip_addr;
   unsigned short port;
   int accept_fd;

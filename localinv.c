@@ -139,7 +139,7 @@ static void inner_print_inventory(struct fnode *a, FILE *out)/*{{{*/
       fprintf(out ? out : stdout, "D                   %s\n", b->path);
       inner_print_inventory((struct fnode *) &b->x.dir.next, out);
     } else {
-      fprintf(out ? out : stdout, "F %8d %08lx %s\n", b->x.file.size, b->x.file.mtime, b->path);
+      fprintf(out ? out : stdout, "F %8d %08lx %s\n", (int)b->x.file.size, b->x.file.mtime, b->path);
     }
   }
 }

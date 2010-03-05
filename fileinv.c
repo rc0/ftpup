@@ -151,7 +151,6 @@ static void delete_entry(struct fnode *a, const char *line)/*{{{*/
   struct fnode *d;
   const char *tail;
   struct fnode *e;
-  struct fnode *nfn;
 
   p = line+1;
   while (isspace(*p)) p++;
