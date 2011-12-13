@@ -383,7 +383,7 @@ static void preen_listing(const char *listing_file)/*{{{*/
 
   init_remote_params(&rp);
   fileinv = make_fileinv(listing_file, &rp);
-  print_inventory(fileinv, nlf, rp.hostname, rp.username, rp.remote_root);
+  print_inventory(fileinv, nlf, rp.hostname, rp.port_number, rp.username, rp.remote_root);
   if (rename(nlf, listing_file) < 0) {
     fprintf(stderr, "Could not rename new listing file %s to %s\n", nlf, listing_file);
     exit(1);
@@ -422,7 +422,7 @@ int upload(const char *password, int is_dummy_run, const char *listing_file, int
     upload_dummy(localinv, fileinv);
   } else {
     struct FTP *ctrl_con;
-    ctrl_con = ftp_open(rp.hostname, rp.username, password, active_ftp);
+    ctrl_con = ftp_open(rp.hostname, rp.port_number, rp.username, password, active_ftp);
     if (rp.remote_root) {
       ftp_cwd(ctrl_con, rp.remote_root);
     }

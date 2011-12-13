@@ -119,7 +119,7 @@ static void put_cmd(struct FTP *con, const char *cmd, const char *arg)/*{{{*/
   free(xcmd);
 }
 /*}}}*/
-struct FTP *ftp_open(const char *hostname, const char *username, const char *password, int active_ftp)/*{{{*/
+struct FTP *ftp_open(const char *hostname, const int port_number, const char *username, const char *password, int active_ftp)/*{{{*/
 {
   struct FTP *result;
   struct hostent *host;
@@ -141,7 +141,7 @@ struct FTP *ftp_open(const char *hostname, const char *username, const char *pas
         (((unsigned long) address0[3])));
 
   addr.sin_family = AF_INET;
-  addr.sin_port   = htons(21); /* FTP */
+  addr.sin_port   = htons(port_number); /* FTP */
   addr.sin_addr.s_addr = htonl(ip);
   addrlen = sizeof(addr);
 

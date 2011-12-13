@@ -20,6 +20,7 @@
    or the 3 special entries that only occur once:
    H <hostname>
    U <username>
+   P <port_number>
    R <remote_root>
 
    The last match for given filename wins.  This allows appending to the end of
@@ -228,6 +229,8 @@ struct fnode *make_fileinv(const char *listing, struct remote_params *rp)/*{{{*/
       case 'U':
         rp->username = copy_data(line);
         break;
+      case 'P':
+        rp->port_number = atoi(line+2);
       case 'R':
         rp->remote_root = copy_data(line);
         break;

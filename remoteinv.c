@@ -69,12 +69,12 @@ static void scan_one_dir(struct FTP *ctrl_con, const char *path, struct fnode *x
 }
 /*}}}*/
 
-struct fnode *make_remoteinv(const char *hostname, const char *username, const char *password, const char *remote_root, int active_ftp)/*{{{*/
+struct fnode *make_remoteinv(const char *hostname, const int port_number, const char *username, const char *password, const char *remote_root, int active_ftp)/*{{{*/
 {
   struct FTP *ftp_con;
   struct fnode *result;
 
-  ftp_con = ftp_open(hostname, username, password, active_ftp);
+  ftp_con = ftp_open(hostname, port_number, username, password, active_ftp);
   if (remote_root) {
     ftp_cwd(ftp_con, remote_root);
   }

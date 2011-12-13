@@ -10,13 +10,20 @@ int verbose = 0;
 
 static void usage(void)
 {
-  /* TODO : write this. */
+  fprintf(stderr, "First time usage:\n"
+      "  ftpup -R -U <username> [-P <port_number>] [-R <remote_root>] <hostname>\n"
+      "Subsequent use:\n"
+      "  ftpup -U        <- do upload\n"
+      "  ftpup -U [-a]   <- do upload using active FTP\n"
+      "  ftpup -N        <- dry_run : see what would be uploaded\n"
+      );
 }
 
 int main (int argc, char **argv) {
 
   struct fnode *reminv;
   char *hostname = NULL;
+  int port_number = 21;
   char *username = NULL;
   char *password = NULL;
   char *remote_root = NULL;
@@ -24,18 +31,18 @@ int main (int argc, char **argv) {
 
   /* Download the remote tree to create an initial inventory listing. */
   int do_remote_inv = 0;
-  
+
   /* Download the remote tree and see what is out of step with the listing file. */
   int do_lint = 0;
-  
+
   /* Actually do the upload operation. */
   int do_upload = 0;
-  
+
   /* Work out what would get uploaded/removed and show to user */
   int do_dummy_upload = 0;
 
   int active_ftp = 0;
-  
+
   while (++argv, --argc) {
     if ((*argv)[0] == '-') {
       if (!strcmp(*argv, "-u")) {
@@ -44,6 +51,9 @@ int main (int argc, char **argv) {
       } else if (!strcmp(*argv, "-p")) {
         --argc, ++argv;
         password = *argv;
+      } else if (!strcmp(*argv, "-P")) {
+        --argc, ++argv;
+        port_number = atoi(*argv);
       } else if (!strcmp(*argv, "-r")) {
         --argc, ++argv;
         remote_root = *argv;
@@ -87,7 +97,7 @@ int main (int argc, char **argv) {
   if (!listing_file) {
     listing_file = "@@LISTING@@";
   }
-  
+
   if (do_remote_inv) {
     if (!hostname) {
       fprintf(stderr, "-R requires hostname\n");
@@ -97,8 +107,8 @@ int main (int argc, char **argv) {
       fprintf(stderr, "-R requires username\n");
       exit(1);
     }
-    reminv = make_remoteinv(hostname, username, password, remote_root, active_ftp);
-    print_inventory(reminv, listing_file, hostname, username, remote_root);
+    reminv = make_remoteinv(hostname, port_number, username, password, remote_root, active_ftp);
+    print_inventory(reminv, listing_file, hostname, port_number, username, remote_root);
   } else if (do_lint) {
   } else if (do_upload) {
     upload(password, 0, listing_file, active_ftp);
@@ -108,8 +118,4 @@ int main (int argc, char **argv) {
 
   return 0;
 }
-
-/* arch-tag: 14fd4ccf-b03d-44bf-bdf3-8d258543a1ae
-*/
-
 

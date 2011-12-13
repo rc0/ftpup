@@ -12,6 +12,7 @@ struct FTP_stat {
 };
 
 extern struct FTP *ftp_open(const char *host,
+                            const int port_number,
                             const char *username,
                             const char *password,
                             int active_ftp);
