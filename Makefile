@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -Wall
+CFLAGS=-O -g -Wall
 
 OBJ := main.o localinv.o fileinv.o remoteinv.o \
     namecheck.o \

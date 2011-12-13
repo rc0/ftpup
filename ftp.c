@@ -134,7 +134,7 @@ struct FTP *ftp_open(const char *hostname, const int port_number, const char *us
   
   host = gethostbyname(hostname);
   if (!host) return NULL;
-  address0 = host->h_addr_list[0];
+  address0 = (unsigned char *) host->h_addr_list[0];
   ip = ((((unsigned long) address0[0]) << 24) |
         (((unsigned long) address0[1]) << 16) |
         (((unsigned long) address0[2]) <<  8) |
@@ -323,14 +323,10 @@ static int open_active_data_con(struct FTP *ctrl_con)/*{{{*/
 {
   struct sockaddr_in peer_sock_addr;
   unsigned int peer_sock_addr_len;
-  unsigned long ip_addr;
-  unsigned short port;
   int accept_fd;
 
   peer_sock_addr_len = sizeof(peer_sock_addr);
   accept_fd = accept(ctrl_con->listen_fd, (struct sockaddr *) &peer_sock_addr, &peer_sock_addr_len);
-  ip_addr = htonl(peer_sock_addr.sin_addr.s_addr);
-  port = ntohs(peer_sock_addr.sin_port);
 
   /* Don't need to listen any longer. */
   close(ctrl_con->listen_fd);
@@ -427,7 +423,7 @@ int ftp_names(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
   /* hack. */
   char *tnames[1024];
   int N;
-  int data_fd;
+  int data_fd = -1;
   int i;
   int status;
   FILE *in;
@@ -490,7 +486,7 @@ int ftp_lsdir(struct FTP *ctrl_con, const char *dir_path,/*{{{*/
               struct FTP_stat **file_data,
               int *n_files)
 {
-  int data_fd;
+  int data_fd = -1;
   char line[1024];
   char *fields[16];
   int n_fields;
@@ -629,8 +625,8 @@ int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_p
 {
 
 #define CHUNKSIZE 512
-  
-  int data_fd;
+
+  int data_fd = -1;
   FILE *local, *remote;
   int status;
   char buffer[CHUNKSIZE];
