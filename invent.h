@@ -57,6 +57,4 @@ int upload(const char *password, int is_dummy_run, const char *listing_file, int
 
 #endif /* INVENT_H */
 
-/* arch-tag: c12bf55b-97e2-4ffe-9092-2345b28d57c9
-*/
 

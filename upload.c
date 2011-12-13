@@ -435,5 +435,3 @@ int upload(const char *password, int is_dummy_run, const char *listing_file, int
 }
 /*}}}*/
 
-/* arch-tag: 33897a53-8f50-4ecb-802b-5ddfac6e4a95
-*/

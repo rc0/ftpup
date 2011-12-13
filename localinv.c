@@ -177,6 +177,3 @@ int main (int argc, char **argv)/*{{{*/
 /*}}}*/
 #endif
 
-/* arch-tag: 1f24cd61-88e2-481c-b7e5-44a81033d38c
-*/
-

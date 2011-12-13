@@ -11,7 +11,7 @@ int verbose = 0;
 static void usage(void)
 {
   fprintf(stderr, "First time usage:\n"
-      "  ftpup -R -U <username> [-P <port_number>] [-R <remote_root>] <hostname>\n"
+      "  ftpup -R -u <username> [-P <port_number>] [-r <remote_root>] <hostname>\n"
       "Subsequent use:\n"
       "  ftpup -U        <- do upload\n"
       "  ftpup -U [-a]   <- do upload using active FTP\n"

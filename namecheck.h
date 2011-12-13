@@ -17,5 +17,3 @@ extern enum nc_result lookup_namecheck(const struct namecheck *, const char *fil
 
 #endif /* NAMECHECK_H */
 
-/* arch-tag: 5545aedb-7a46-4b36-8923-8838f34a922b
- * */

@@ -14,5 +14,3 @@ ftpup : $(OBJ)
 clean:
 	-rm -f *.o ftpup
 
-# arch-tag: d136d184-baa0-4ea4-8d6f-316463678321
-

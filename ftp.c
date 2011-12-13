@@ -691,6 +691,3 @@ int ftp_write(struct FTP *ctrl_con, const char *local_path, const char *remote_p
 }
 /*}}}*/
 
-/* arch-tag: 4b5f74ca-8738-4367-ad53-12185fb7bd85
-*/
-

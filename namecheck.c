@@ -204,5 +204,3 @@ enum nc_result lookup_namecheck(const struct namecheck *nc, const char *filename
   return NC_UNMATCHED;
 }
 /*}}}*/
-/* arch-tag: b2462a14-b47e-4b6e-ba7f-722fc53e1ab3
- * */

@@ -8,6 +8,4 @@ int main (int argc, char **argv) {
   }
 }
 
-/* arch-tag: 8561c3cc-073f-48f2-87e3-d1e064137329
-*/
 

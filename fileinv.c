@@ -271,6 +271,3 @@ int main (int argc, char **argv) {
 }
 #endif
 
-/* arch-tag: a2bd7446-7fee-4bd3-b1d2-db4e448b53a8
-*/
-

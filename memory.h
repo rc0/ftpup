@@ -15,6 +15,3 @@
 
 #endif /* MEMMAC_H */
 
-/* arch-tag: 49db86d3-72a8-4d8d-b3a5-4d323ed537c6
-*/
-

@@ -86,6 +86,3 @@ struct fnode *make_remoteinv(const char *hostname, const int port_number, const 
 }
 /*}}}*/
 
-/* arch-tag: afdeef23-00ab-483e-b0fc-08973895f87a
-*/
-

@@ -58,7 +58,3 @@ extern int ftp_names(struct FTP *ctrl_con, const char *dir_path,
 
 extern int ftp_binary(struct FTP *ctrl_con);
 
-
-/* arch-tag: 522f1f64-1ee6-4e68-be91-ffaab000be9c
-*/
-
