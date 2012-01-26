@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <time.h>
 
 #include "ftp.h"
@@ -265,6 +266,12 @@ static void create_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
   status = ftp_write(ctrl_con, file->path, file->path, write_callback, &info);
   /* FIXME : md5sum */
   if (status) {
+    struct stat sb;
+    if (stat(file->path, &sb) < 0) {
+      fprintf(stderr, "Could not stat the file I just uploaded\n");
+      exit(1);
+    }
+    file->x.file.mtime = sb.st_mtime;
     fprintf(journal, "F %8d %08lx %s\n", (int)file->x.file.size, file->x.file.mtime, file->path);
     fflush(journal);
     printf("\rDone creating new remote file %s (%d bytes)\n", file->path, (int)file->x.file.size);
@@ -312,6 +319,12 @@ static void update_file(struct FTP *ctrl_con, struct fnode *file, FILE *journal)
   status = ftp_write(ctrl_con, file->path, file->path, write_callback, &info);
   /* FIXME : md5sum */
   if (status) {
+    struct stat sb;
+    if (stat(file->path, &sb) < 0) {
+      fprintf(stderr, "Could not stat the file I just uploaded\n");
+      exit(1);
+    }
+    local_peer->x.file.mtime = sb.st_mtime;
     fprintf(journal, "F %8d %08lx %s\n", (int)local_peer->x.file.size, local_peer->x.file.mtime, file->path);
     fflush(journal);
     printf("\rDone updating remote file %s (%d bytes)\n", file->path, (int)local_peer->x.file.size);
