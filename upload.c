@@ -33,6 +33,8 @@ static void inner_reconcile(struct fnode *f1, struct fnode *f2)/*{{{*/
   struct fnode *e1;
   struct fnode *e2;
 
+  /* f1 is from 'fileinv', f2 is from 'localinv' */
+
   for (e1 = f1->next; e1 != f1; e1 = e1->next) {
     for (e2 = f2->next; e2 != f2; e2 = e2->next) {
       if (!strcmp(e1->name, e2->name)) {
@@ -75,9 +77,11 @@ matched:
         if (e1->x.file.size == e2->x.file.size) {
           /* Further check based on mtime.  Treat zero mtime as a wildcard
            * (e.g. when the remote index has been built for the first time.)
+           * Allow a grace window of 2 seconds, because strange things seem to
+           * happen to mtimes on VFAT filesystems...
            * */
           if (!e1->x.file.mtime || !e2->x.file.mtime ||
-              (e1->x.file.mtime == e2->x.file.mtime)) {
+              ((int)(e2->x.file.mtime - e1->x.file.mtime) < 2)) {
             e1->x.file.is_stale = e2->x.file.is_stale = 0;
           } else {
             e1->x.file.is_stale = e2->x.file.is_stale = 1;
