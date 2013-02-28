@@ -16,6 +16,9 @@ static void usage(void)
       "  ftpup -U        <- do upload\n"
       "  ftpup -U [-a]   <- do upload using active FTP\n"
       "  ftpup -N        <- dry_run : see what would be uploaded\n"
+      "Special options:\n"
+      "  -l <listing_file> : file containing the remote inventory (default: @@LISTING@@)\n"
+      "  -p <password>     : supply FTP password                  (default: prompt for it)\n"
       );
 }
 
